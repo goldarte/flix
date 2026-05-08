@@ -114,7 +114,7 @@ You can also work with parameters using `p` command in the console. Parameter na
 
 The IMU orientation (relative to the drone's axes) is defined using the parameters: `IMU_ROT_ROLL`, `IMU_ROT_PITCH`, and `IMU_ROT_YAW`.
 
-The drone has *X* axis pointing forward, *Y* axis pointing left, and *Z* axis pointing up, and the supported IMU boards have *X* axis pointing to the pins side and *Z* axis pointing up from the component side:
+The drone has *X* axis pointing forward, *Y* axis pointing left, and *Z* axis pointing up, and the supported IMU boards have *X* axis pointing to the mounting holes side and *Z* axis pointing up from the component side:
 
 <img src="img/imu-axes.png" width="200">
 
@@ -122,10 +122,10 @@ Use the following table to set the parameters for common IMU orientations:
 
 |Orientation|Parameters|Orientation|Parameters|
 |:-:|-|-|-|
-|<img src="img/imu-rot-1.png" width="180">|`IMU_ROT_ROLL` = 0<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = 0    |<img src="img/imu-rot-5.png" width="180">|`IMU_ROT_ROLL` = 3.142<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = 0|
-|<img src="img/imu-rot-2.png" width="180">|`IMU_ROT_ROLL` = 0<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = 1.571|<img src="img/imu-rot-6.png" width="180">|`IMU_ROT_ROLL` = 3.142<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = -1.571|
-|<img src="img/imu-rot-3.png" width="180">|`IMU_ROT_ROLL` = 0<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = 3.142|<img src="img/imu-rot-7.png" width="180">|`IMU_ROT_ROLL` = 3.142<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = 3.142|
-|<img src="img/imu-rot-4.png" width="180"><br>☑️ **Default**|<br>`IMU_ROT_ROLL` = 0<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = -1.571|<img src="img/imu-rot-8.png" width="180">|`IMU_ROT_ROLL` = 3.142<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = 1.571|
+|<img src="img/imu-rot-3.png" width="180">|`IMU_ROT_ROLL` = 0<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = 0    |<img src="img/imu-rot-7.png" width="180">|`IMU_ROT_ROLL` = 3.142<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = 0|
+|<img src="img/imu-rot-2.png" width="180">|`IMU_ROT_ROLL` = 0<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = -1.571|<img src="img/imu-rot-6.png" width="180">|`IMU_ROT_ROLL` = 3.142<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = -1.571|
+|<img src="img/imu-rot-1.png" width="180">|`IMU_ROT_ROLL` = 0<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = 3.142|<img src="img/imu-rot-5.png" width="180">|`IMU_ROT_ROLL` = 3.142<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = 3.142|
+|<img src="img/imu-rot-4.png" width="180"><br>☑️ **Default**|<br>`IMU_ROT_ROLL` = 0<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = 1.571|<img src="img/imu-rot-8.png" width="180">|`IMU_ROT_ROLL` = 3.142<br>`IMU_ROT_PITCH` = 0<br>`IMU_ROT_YAW` = 1.571|
 
 ### Calibrate accelerometer
 
@@ -138,7 +138,7 @@ Before flight you need to calibrate the accelerometer:
 
 If using non-default motor pins, set the pin numbers using the parameters: `MOTOR_PIN_FL`, `MOTOR_PIN_FR`, `MOTOR_PIN_RL`, `MOTOR_PIN_RR` (front-left, front-right, rear-left, rear-right respectively).
 
-Certain ESP32 models (such as ESP32-S3) support a lower maximum PWM frequency; on these boards the parameter `MOT_PWM_FREQ` should be set to 40000 Hz.
+Certain ESP32 models (such as ESP32-S3) support a lower maximum PWM frequency; on these boards the parameter `MOT_PWM_FREQ` should be set to 38000 Hz.
 
 If using brushless motors and ESCs:
 
