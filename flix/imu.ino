@@ -23,6 +23,27 @@ LowPassFilter<Vector> gyroBiasFilter(0.001);
 
 void setupIMU() {
 	print("Setup IMU\n");
+
+	// default pins
+	// static const uint8_t SS = 5;
+	// static const uint8_t MOSI = 23;
+	// static const uint8_t MISO = 19;
+	// static const uint8_t SCK = 18;
+
+	// default connection
+	// SCL → IO18 (SCK)
+	// SDA (MOSI) → IO23 (MOSI)
+	// AD0 (MISO) → IO19 (MISO)
+	// NCS → IO5 (SS)
+
+	// new connection
+	// SCL - 1
+	// SDA - 2
+	// AD0 - 3
+	// NCS - 4
+
+	// Use custom pins for SCK, MISO, MOSI, and SS
+	SPI.begin(1,3,2,4);
 	imu.begin();
 	configureIMU();
 }
