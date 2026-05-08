@@ -10,7 +10,7 @@
 
 float voltage;
 LowPassFilter<float> voltageFilter(0.2);
-int voltagePin = -1;
+int voltagePin = 6;
 float voltageScale = 2;
 
 void setupPower() {
