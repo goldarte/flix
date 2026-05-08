@@ -22,6 +22,7 @@ void setup() {
 	setupPower();
 	setupLED();
 	setLED(true);
+	setupLEDStrip();
 	setupMotors();
 	setupWiFi();
 	setupIMU();
@@ -42,4 +43,5 @@ void loop() {
 	readVoltage();
 	logData();
 	syncParameters();
+	setLEDStripRainbow(7, 5);
 }
