@@ -6,13 +6,11 @@
 #include <Preferences.h>
 #include "util.h"
 
-extern int channelZero[16];
-extern int channelMax[16];
+extern int channelZero[16], channelMax[16];
 extern int rollChannel, pitchChannel, throttleChannel, yawChannel, armedChannel, modeChannel;
-extern int rcRxPin;
-extern int wifiMode, udpLocalPort, udpRemotePort;
+extern int rcRxPin, voltagePin;
+extern int wifiMode, wifiLongRange, udpLocalPort, udpRemotePort, espnowChannel;
 extern float rcLossTimeout, descendTime;
-extern int voltagePin;
 extern float voltageScale;
 extern LowPassFilter<float> voltageFilter;
 
@@ -86,7 +84,7 @@ Parameter parameters[] = {
 	{"MOT_PWM_MIN", &pwmMin},
 	{"MOT_PWM_MAX", &pwmMax},
 	// rc
-	{"RC_RX_PIN", &rcRxPin},
+	{"RC_RX_PIN", &rcRxPin, setupRC},
 	{"RC_ZERO_0", &channelZero[0]},
 	{"RC_ZERO_1", &channelZero[1]},
 	{"RC_ZERO_2", &channelZero[2]},
@@ -110,14 +108,17 @@ Parameter parameters[] = {
 	{"RC_MODE", &modeChannel},
 	// wifi
 	{"WIFI_MODE", &wifiMode},
-	{"WIFI_LOC_PORT", &udpLocalPort},
-	{"WIFI_REM_PORT", &udpRemotePort},
+	{"WIFI_PORT_LOC", &udpLocalPort},
+	{"WIFI_PORT_REM", &udpRemotePort},
+	{"WIFI_LONG_RANGE", &wifiLongRange},
+	// espnow
+	{"ESPNOW_CHANNEL", &espnowChannel},
 	// mavlink
 	{"MAV_SYS_ID", &mavlinkSysId},
 	{"MAV_RATE_SLOW", &telemetrySlow.rate},
 	{"MAV_RATE_FAST", &telemetryFast.rate},
 	// power
-	{"PWR_VOLT_PIN", &voltagePin},
+	{"PWR_VOLT_PIN", &voltagePin, setupPower},
 	{"PWR_VOLT_SCALE", &voltageScale},
 	{"PWR_VOLT_LPF_A", &voltageFilter.alpha},
 	// safety
@@ -187,8 +188,9 @@ void syncParameters() {
 	}
 }
 
-void printParameters() {
+void printParameters(const char *filter) {
 	for (auto &parameter : parameters) {
+		if (strncasecmp(parameter.name, filter, strlen(filter))) continue;
 		print("%s = %g\n", parameter.name, parameter.getValue());
 	}
 }

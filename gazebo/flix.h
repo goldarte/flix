@@ -43,9 +43,10 @@ void print(const char* format, ...);
 void pause(float duration);
 void doCommand(String str, bool echo);
 void handleInput();
+void setupRC();
 void normalizeRC();
 void calibrateRC();
-void calibrateRCChannel(int *channel, uint16_t zero[16], uint16_t max[16], const char *str);
+void calibrateRCChannel(int*, uint16_t[16], uint16_t[16], const char*);
 void printRCCalibration();
 void printLogHeader();
 void printLogData();
@@ -57,6 +58,7 @@ void handleMavlink(const void *_msg);
 void mavlinkPrint(const char* str);
 void sendMavlinkPrint();
 inline Quaternion fluToFrd(const Quaternion &q);
+void setupPower();
 void failsafe();
 void rcLossFailsafe();
 void descend();
@@ -66,7 +68,7 @@ const char *getParameterName(int index);
 float getParameter(int index);
 float getParameter(const char *name);
 bool setParameter(const char *name, const float value);
-void printParameters();
+void printParameters(const char *filter);
 void resetParameters();
 
 // mocks

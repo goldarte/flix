@@ -4,6 +4,30 @@ This page contains user-built drones based on the Flix project. Publish your pro
 
 ---
 
+Author: [Awab Anas](http://t.me/AW_VENOM).<br>
+Description: ESP32 D1 Mini, MPU-6050, 8520 3.7V brushed motors, 55 mm propellers, battery li-po 1200 mAh, controlling via [Mavlink Joystick app](https://github.com/goldarte/mavlink-joystick/releases/latest).<br>
+[Flight validation](https://drive.google.com/file/d/12z0jfctZDBA6b5UKCG0Uje5rAxj6DhF-/view?usp=sharing).
+
+<img src="img/user/aw_venom/1.jpg" height=200>
+
+---
+
+Author: [Ina Tix](https://t.me/ina_tix).<br>
+Description: XR2981 based DC-DC converter, ELRS MINI 2.4GHz RX SX1280 receiver (SBUS interface), Radiomaster TX12 remote control.<br>
+[Flight validation](https://drive.google.com/file/d/1yqkKNuz4R_yxGqUNQxVpixJbXqEEcUSj/view?usp=share_link).
+
+<img src="img/user/ina_tix/1.jpg" height=200> <img src="img/user/ina_tix/2.jpg" height=200> <img src="img/user/ina_tix/3.jpg" height=200>
+
+---
+
+Author: Oleg Kalachev.<br>
+Description: the first attempt on making an official PCB based Flix drone (Flix2 board). The IMU is not working on this version, so an external MPU-6050 board was used, therefore considered as **Flix version 1.5**.<br>
+[Flight video](https://drive.google.com/file/d/1R7tuUsFmPY0CGcOCFfMFaCp9kR49K3bl/view?usp=sharing).
+
+<img src="img/flix1.5.jpg" width=300>
+
+---
+
 Author: [FanBy0ru](https://https://github.com/FanBy0ru).<br>
 Description: custom 3D-printed frame.<br>
 Frame STLs and flight validation: https://cults3d.com/en/3d-model/gadget/armature-pour-flix-drone.
@@ -38,6 +62,17 @@ Author: [goldarte](https://t.me/goldarte).<br>
 **Flight video:**
 
 <a href="https://drive.google.com/file/d/1nQtFjEcGGLx-l4xkL5ko9ZpOTVU-WDjL/view?usp=sharing"><img height=200 src="img/user/goldarte/video.jpg"></a>
+
+---
+
+Author: [malagis](https://oshwhub.com/malagis).<br>
+
+A Chinese custom PCB version of Flix with a big community of users, lots of materials and modifications.
+
+Main project's page: https://oshwhub.com/malagis/esp32-mini-plane.<br>
+Video about the project: https://www.bilibili.com/video/BV14vyqBFEJn/.
+
+<img src="img/user/malagis/1.jpg" height=200> <img src="img/user/malagis/2.jpg" height=200> <img src="img/user/malagis/3.jpg" height=200>
 
 ---
 

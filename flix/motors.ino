@@ -14,15 +14,13 @@ int pwmStop = 0;
 int pwmMin = 0;
 int pwmMax = -1; // -1 means duty cycle mode
 
-const int MOTOR_REAR_LEFT = 0;
-const int MOTOR_REAR_RIGHT = 1;
-const int MOTOR_FRONT_RIGHT = 2;
-const int MOTOR_FRONT_LEFT = 3;
+const int MOTOR_REAR_LEFT = 0, MOTOR_REAR_RIGHT = 1, MOTOR_FRONT_RIGHT = 2, MOTOR_FRONT_LEFT = 3;
 
 void setupMotors() {
 	print("Setup Motors\n");
-	// configure pins
+	// Configure pins
 	for (int i = 0; i < 4; i++) {
+		if (motorPins[i] < 0) continue; // skip unassigned motors
 		ledcAttach(motorPins[i], pwmFrequency, pwmResolution);
 		pwmFrequency = ledcChangeFrequency(motorPins[i], pwmFrequency, pwmResolution); // when reconfiguring
 	}
@@ -32,12 +30,14 @@ void setupMotors() {
 
 void sendMotors() {
 	for (int i = 0; i < 4; i++) {
+		if (motorPins[i] < 0) continue; // skip unassigned motors
 		ledcWrite(motorPins[i], getDutyCycle(motors[i]));
 	}
 }
 
 int getDutyCycle(float value) {
 	value = constrain(value, 0, 1);
+
 	if (pwmMax >= 0) { // pwm mode
 		float pwm = mapf(value, 0, 1, pwmMin, pwmMax);
 		if (value == 0) pwm = pwmStop;

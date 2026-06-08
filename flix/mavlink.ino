@@ -41,12 +41,12 @@ void sendMavlink() {
 			MAV_VTOL_STATE_UNDEFINED, landed ? MAV_LANDED_STATE_ON_GROUND : MAV_LANDED_STATE_IN_AIR);
 		sendMessage(&msg);
 
-		uint16_t voltages[] = {voltage * 1000, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX};
+		uint16_t voltages[] = {(uint16_t)(voltage * 1000), UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX};
 		uint16_t voltagesExt[] = {0, 0, 0, 0};
 		float remaining = constrain(mapf(voltage, 3.4, 4.2, 0, 1), 0, 1);
 		mavlink_msg_battery_status_pack(mavlinkSysId, MAV_COMP_ID_AUTOPILOT1, &msg, 0, MAV_BATTERY_FUNCTION_ALL,
 			MAV_BATTERY_TYPE_LIPO, INT16_MAX, voltages, -1, -1, -1, remaining * 100, 0, MAV_BATTERY_CHARGE_STATE_OK, voltagesExt, 0, 0);
-		sendMessage(&msg);
+		if (valid(voltage)) sendMessage(&msg);
 	}
 
 	if (telemetryFast && mavlinkConnected) {
@@ -81,13 +81,13 @@ void sendMessage(const void *msg) {
 void receiveMavlink() {
 	uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 	int len = receiveWiFi(buf, MAVLINK_MAX_PACKET_LEN);
-	if (len) mavlinkConnected = true;
 
 	// New packet, parse it
 	mavlink_message_t msg;
 	mavlink_status_t status;
 	for (int i = 0; i < len; i++) {
 		if (mavlink_parse_char(MAVLINK_COMM_0, buf[i], &msg, &status)) {
+			mavlinkConnected = true;
 			handleMavlink(&msg);
 		}
 	}
@@ -241,7 +241,7 @@ void handleMavlink(const void *_msg) {
 		}
 
 		if (m.command == MAV_CMD_COMPONENT_ARM_DISARM) {
-			if (m.param1 && controlThrottle > 0.05) return; // don't arm if throttle is not low
+			if (m.param1 == 1 && controlThrottle > 0.05) return; // don't arm if throttle is not low
 			accepted = true;
 			armed = m.param1 == 1;
 		}

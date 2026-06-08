@@ -26,7 +26,8 @@ You can build and upload the firmware using either **Arduino IDE** (easier for b
    * `MAVLink`, version 2.0.25.
 5. Open the `flix/flix.ino` sketch from downloaded firmware sources in Arduino IDE.
 6. Connect your ESP32 board to the computer and choose correct board type in Arduino IDE (*WEMOS D1 MINI ESP32* for ESP32 Mini) and the port.
-7. [Build and upload](https://docs.arduino.cc/software/ide-v2/tutorials/getting-started/ide-v2-uploading-a-sketch) the firmware using Arduino IDE.
+7. Set *Tools* ⇒ *Core Debug Level* to *Error* to see the errors in the serial console. Set *Tools* ⇒ *USB CDC on Boot* to *Enabled* for ESP32-S3/ESP32-C3 boards.
+8. [Build and upload](https://docs.arduino.cc/software/ide-v2/tutorials/getting-started/ide-v2-uploading-a-sketch) the firmware using Arduino IDE.
 
 ### Command line (Windows, Linux, macOS)
 
@@ -55,6 +56,12 @@ You can build and upload the firmware using either **Arduino IDE** (easier for b
 
    ```bash
    make upload monitor
+   ```
+
+   For ESP32-S3/ESP32-C3 boards, set the appropriate [FQBN](https://docs.arduino.cc/arduino-cli/FAQ/#whats-the-fqbn-string) using `BOARD` parameter:
+
+   ```bash
+   make BOARD=esp32:esp32:esp32s3:DebugLevel=error,FlashSize=4M,CDCOnBoot=cdc upload
    ```
 
 See other available Make commands in [Makefile](../Makefile).
@@ -138,7 +145,7 @@ Before flight you need to calibrate the accelerometer:
 
 If using non-default motor pins, set the pin numbers using the parameters: `MOTOR_PIN_FL`, `MOTOR_PIN_FR`, `MOTOR_PIN_RL`, `MOTOR_PIN_RR` (front-left, front-right, rear-left, rear-right respectively).
 
-Certain ESP32 models (such as ESP32-S3) support a lower maximum PWM frequency; on these boards the parameter `MOT_PWM_FREQ` should be set to 38000 Hz.
+Certain ESP32 models (such as ESP32-S3 and ESP32-C3) support a lower maximum PWM frequency; on these boards the parameter `MOT_PWM_FREQ` should be set to 38000 Hz.
 
 If using brushless motors and ESCs:
 
@@ -170,7 +177,7 @@ After this setup, you should see the battery voltage in QGroundControl top panel
 
 2. Check the attitude estimation: connect to the drone using QGroundControl, rotate the drone in different orientations and check if the attitude estimation shown in QGroundControl is correct. Compare your attitude indicator (in the *large vertical* mode) to the video:
 
-    <a href="https://youtu.be/yVRN23-GISU"><img width=300 src="https://i3.ytimg.com/vi/yVRN23-GISU/maxresdefault.jpg"></a>
+   <a href="https://youtu.be/yVRN23-GISU"><img width=300 src="https://i3.ytimg.com/vi/yVRN23-GISU/maxresdefault.jpg"></a>
 
 3. Perform motor tests. Use the following commands **— remove the propellers before running the tests!**
 
@@ -192,6 +199,18 @@ There are several ways to control the drone's flight: using **smartphone** (Wi-F
 
 ### Control with a smartphone
 
+#### Using Mavlink Joystick app (Android)
+
+<img src="https://github.com/goldarte/mavlink-joystick/blob/master/app_screen.png?raw=true" width="400">
+
+1. Download and install [Mavlink Joystick app](https://github.com/goldarte/mavlink-joystick/releases/latest).
+2. Power the drone using the battery.
+3. Connect your smartphone to the appeared `flix` Wi-Fi network (password: `flixwifi`).
+4. Open Mavlink Joystick app. It should connect and begin showing the drone's telemetry automatically.
+5. Use the virtual joystick to fly the drone!
+
+#### Using QGroundControl app
+
 1. Install [QGroundControl mobile app](https://docs.qgroundcontrol.com/master/en/qgc-user-guide/getting_started/download_and_install.html#android) on your smartphone.
 2. Power the drone using the battery.
 3. Connect your smartphone to the appeared `flix` Wi-Fi network (password: `flixwifi`).
@@ -204,11 +223,11 @@ There are several ways to control the drone's flight: using **smartphone** (Wi-F
 
 ### Control with a remote control
 
-Before using SBUS-connected remote control you need to enable SBUS and calibrate it:
+If using SBUS-connected remote control you need to enable SBUS and calibrate it:
 
 1. Connect to the drone using QGroundControl.
 2. In parameters, set the `RC_RX_PIN` parameter to the GPIO pin number where the SBUS signal is connected, for example: 4. Negative value disables SBUS.
-3. Reboot the drone to apply changes.
+3. Check if the receiver is working using `rc` command in the console.
 4. Open the console, type `cr` command and follow the instructions to calibrate the remote control.
 5. Use the remote control to fly the drone!
 
@@ -278,11 +297,8 @@ The Wi-Fi mode is chosen using `WIFI_MODE` parameter in QGroundControl or in the
 
 * `0` — Wi-Fi is disabled.
 * `1` — Access Point mode *(AP)* — the drone creates a Wi-Fi network.
-* `2` — Client mode *(STA)* — the drone connects to an existing Wi-Fi network.
-* `3` — *ESP-NOW (not implemented yet)*.
-
-> [!WARNING]
-> Tests showed that Client mode may cause **additional delays** in remote control (due to retranslations), so it's generally not recommended.
+* `2` — Client mode *(STA)* — the drone connects to an existing Wi-Fi network (may cause additional delays, so generally not recommended).
+* `3` — ESP-NOW mode — the drone uses ESP-NOW protocol for communication.
 
 The SSID and password are configured using the `ap` and `sta` console commands:
 
@@ -303,6 +319,37 @@ Disabling Wi-Fi:
 ```
 p WIFI_MODE 0
 ```
+
+### Using ESP-NOW
+
+[ESP-NOW](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/network/esp_now.html) is a low level wireless communication protocol. It can provide lower latency, better reliability, and longer range than Wi-Fi. However, it requires a second ESP32 board to be used as a proxy for the computer.
+
+<img src="img/espnow-connection.jpg" width="600">
+
+To setup ESP-NOW communication:
+
+1. Flash the second ESP32 board with ESP-NOW proxy sketch: [`tools/espnow-proxy/espnow-proxy.ino`](../tools/espnow-proxy/espnow-proxy.ino). Use Arduino IDE or command line: `make upload_proxy`.
+
+2. Open Serial Monitor or use `make monitor` command. The ESP32 will print its MAC address and generated encryption key, for example:
+
+   ```
+   espnow 7a:c8:e3:eb:bf:e9 &PiuSysxP9+$L&5E
+   ```
+
+   Run this line as a console command on each drone you want to bind to this proxy board. [The maximum number](https://github.com/espressif/esp-idf/blob/e95cab4be8fd293e3f3323181e7a2280874da6f7/components/esp_wifi/include/esp_now.h#L32-L33) of simultaneously connected drones is 20 (unencrypted) io 6 (encrypted).
+
+3. Set the `WIFI_MODE` parameter to `3` on the drone:
+
+   ```
+   p WIFI_MODE 3
+   ```
+
+4. Go to the QGroundControl menu ⇒ *Application Settings* ⇒ *Comm Links*, add new link with the following settings:
+   * Name: ESP32.
+   * Type: Serial.
+   * Serial Port: choose the port of the proxy ESP32 board, e. g. `/dev/cu.usbserial-0001`.
+   * Baud Rate: 115200.
+5. Click *Save*. QGroundControl should connect to the drone using ESP-NOW and begin showing the telemetry.
 
 ## Flight log
 
