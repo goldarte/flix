@@ -43,5 +43,6 @@ void loop() {
 	readVoltage();
 	logData();
 	syncParameters();
-	setLEDStripRainbow(7, 5);
+	handleLED();
+	handleLEDStrip();
 }

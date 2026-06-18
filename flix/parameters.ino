@@ -73,6 +73,8 @@ Parameter parameters[] = {
 	{"EST_ACC_WEIGHT", &accWeight},
 	{"EST_LVL_WEIGHT", &levelWeight},
 	{"EST_RATES_LPF_A", &ratesFilter.alpha},
+	// led strip
+	{"LEDS_MODE", &ledstrip_mode},
 	// motors
 	{"MOT_PIN_FL", &motorPins[MOTOR_FRONT_LEFT], setupMotors},
 	{"MOT_PIN_FR", &motorPins[MOTOR_FRONT_RIGHT], setupMotors},

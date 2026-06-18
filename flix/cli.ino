@@ -36,6 +36,8 @@ const char* motd =
 "preset - reset parameters\n"
 "time - show time info\n"
 "imu - show IMU data\n"
+"led off/on/blink - control board led\n"
+"leds off/rainbow/rus - control led strip\n"
 "ca - calibrate accel\n"
 "st - show state estimation\n"
 "arm - arm the drone\n"
@@ -110,6 +112,15 @@ void doCommand(String str, bool echo = false) {
 		printIMUInfo();
 		printIMUCalibration();
 		print("landed: %d\n", landed);
+	} else if (command == "led") {
+		setLEDMode(arg0);
+	} else if (command == "leds") {
+		bool success = setLEDStripMode(arg0);
+		if (success) {
+			print("Set ledstrip to %s mode ok\n", arg0.c_str());
+		} else {
+			print("Set ledstrip to %s mode failed\n", arg0.c_str());
+		}
 	} else if (command == "st") {
 		print("rates: %g %g %g\n", rates.x, rates.y, rates.z);
 		print("attitude: %g %g %g %g\n", attitude.w, attitude.x, attitude.y, attitude.z);
