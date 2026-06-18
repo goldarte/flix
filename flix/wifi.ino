@@ -90,6 +90,7 @@ void printWiFiInfo() {
 		print("Peer MAC: %s\n", MacAddress(espnow.addr()).toString().c_str());
 		print("Encrypted: %d\n", espnow.isEncrypted());
 		print("Channel: %d\n", espnow.getChannel());
+		print("Lost packets: %d\n", espnow.lost);
 	} else if (WiFi.getMode() == WIFI_MODE_AP) {
 		print("Mode: Access Point (AP)\n");
 		print("MAC: %s\n", WiFi.softAPmacAddress().c_str());
@@ -131,4 +132,21 @@ void configWiFi(int mode, const char *first, const char *second) {
 		return;
 	}
 	print("✓ Reboot to apply new settings\n");
+}
+
+void setWiFiMode(const String& mode) {
+	if (mode == "ap") {
+		wifiMode = W_AP;
+	} else if (mode == "sta") {
+		wifiMode = W_STA;
+	} else if (mode == "espnow") {
+		wifiMode = W_ESPNOW;
+	} else if (mode == "off") {
+		wifiMode = W_DISABLED;
+	} else {
+		print("Invalid Wi-Fi mode\n");
+		return;
+	}
+	static const char *modes[] = {"Disabled", "Access Point (AP)", "Client (STA)", "ESP-NOW"};
+	print("✓ Wi-Fi mode set to %s, reboot to apply\n", modes[wifiMode]);
 }
