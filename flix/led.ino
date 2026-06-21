@@ -121,6 +121,7 @@ void handleLEDStrip() {
 	switch (ledstrip_mode) {
 		case LEDSTRIP_OFF:
 			setLEDStripOff();
+			break;
 		case LEDSTRIP_RAINBOW:
 			setLEDStripRainbow(7,5);
 			break;
