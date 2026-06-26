@@ -1,10 +1,12 @@
 // Copyright (c) 2023 Oleg Kalachev <okalachev@gmail.com>
-// Repository: https://github.com/okalachev/flix
+// Copyright (c) 2026 Arthur Golubtsov <goldartt@gmail.com>
+// Repository: https://github.com/goldarte/flix
 
-// Board's LED control
+// LED control
 
-#include <FastLED.h>
+#include <LiteLED.h>
 
+// Board's LED params
 #define BLINK_PERIOD 500000
 
 #ifndef LED_BUILTIN
@@ -14,16 +16,23 @@
 const int LED_OFF = 0, LED_ON = 1, LED_BLINK = 2;
 int led_mode = LED_OFF;
 
-#define LED_PIN     6      	// GPIO pin connected to Data In
-#define NUM_LEDS    68      // Total number of LEDs
-#define BRIGHTNESS  64      // 0 to 255
-#define LED_TYPE    WS2812B
-#define COLOR_ORDER GRB     // WS2812B is usually GRB
+// LED strip parameters
+#define LED_TYPE    LED_STRIP_WS2812
+#define LED_PIN     6
+#define NUM_LEDS    68
+#define LED_IS_RGBW 0
+#define BRIGHTNESS  50      // 0 to 255
 
-CRGB leds[NUM_LEDS];
-uint8_t hue = 0;
 const int LEDSTRIP_OFF = 0, LEDSTRIP_RAINBOW = 1, LEDSTRIP_RUSSIAN = 2;
 int ledstrip_mode = LEDSTRIP_RUSSIAN;
+
+// LiteLED strip
+LiteLED strip(LED_TYPE, LED_IS_RGBW);
+
+// Helper functions for led strip
+void fillStrip(rgb_t color);
+void fillStripPart(rgb_t color, int start_led, int num_leds);
+crgb_t HSVtoRGB(uint8_t h, uint8_t s, uint8_t v);
 
 void setupLED() {
 	pinMode(LED_BUILTIN, OUTPUT);
@@ -68,42 +77,87 @@ void handleLED() {
 	}
 }
 
+void fillStrip(rgb_t color) {
+  strip.fill(color, true);
+}
+
+void fillStripPart(rgb_t color, int start_led, int num_leds) {
+  for (int i = start_led; i < start_led + num_leds; i++) {
+    strip.setPixel(i, color);
+  }
+}
+
+crgb_t HSVtoRGB(uint8_t h, uint8_t s, uint8_t v) {
+    uint8_t region, remainder, p, q, t;
+    uint8_t r, g, b;
+
+    if (s == 0) {
+        return ((uint32_t)v << 16) | ((uint32_t)v << 8) | v;
+    }
+
+    region = h / 43;
+    remainder = (h - (region * 43)) * 6;
+
+    p = (v * (255 - s)) >> 8;
+    q = (v * (255 - ((s * remainder) >> 8))) >> 8;
+    t = (v * (255 - ((s * (255 - remainder)) >> 8))) >> 8;
+
+    switch (region) {
+        case 0: r = v; g = t; b = p; break;
+        case 1: r = q; g = v; b = p; break;
+        case 2: r = p; g = v; b = t; break;
+        case 3: r = p; g = q; b = v; break;
+        case 4: r = t; g = p; b = v; break;
+        default: r = v; g = p; b = q; break;
+    }
+
+    return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
+}
+
 void setupLEDStrip() {
-	FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+	strip.begin(LED_PIN, NUM_LEDS);
 
 	// Limit brightness to save power
-	FastLED.setBrightness(BRIGHTNESS);
+	strip.brightness(BRIGHTNESS);
 
-	fill_solid(leds, NUM_LEDS, CRGB::Green);
-	FastLED.show();
+	rgb_t green = rgb_from_values(0, 255, 0);
+	fillStrip(green);
 }
 
 void setLEDStripRussian() {
 	static Rate rate(1);
 	if (!rate) return;
 	// red
-	fill_solid(leds, 14, CRGB::Red);
-	fill_solid(leds+54, 14, CRGB::Red);
+	rgb_t red = rgb_from_values(255, 0, 0);
+	fillStripPart(red, 0, 14);
+	fillStripPart(red, 54, 14);
 	// blue
-	fill_solid(leds+14, 6, CRGB::Blue);
-	fill_solid(leds+48, 6, CRGB::Blue);
+	rgb_t blue = rgb_from_values(0, 0, 255);
+	fillStripPart(blue, 14, 6);
+	fillStripPart(blue, 48, 6);
 	// white
-	fill_solid(leds+20, 28, CRGB::White);
-	FastLED.show();
+	rgb_t white = rgb_from_values(255, 255, 255);
+	fillStripPart(white, 20, 28);
+	strip.show();
 }
 
-void setLEDStripRainbow(int led_period, int speed) {
+void setLEDStripRainbow() {
 	static Rate rate(50);
 	if (!rate) return;
-	fill_rainbow(leds, NUM_LEDS, hue-=speed, led_period);
-	FastLED.show();
+	static uint8_t hue = 0;
+	for (size_t i = 0; i < NUM_LEDS; i++) {
+		// Create rainbow effect
+		uint8_t pixelHue = hue + (i * 255 / NUM_LEDS);
+		strip.setPixel(i, HSVtoRGB(pixelHue, 255, 255));
+	}
+	strip.show();
+	hue += 1;
 }
 
 void setLEDStripOff() {
 	static Rate rate(1);
 	if (!rate) return;
-	fill_solid(leds, NUM_LEDS, 0);
-	FastLED.show();
+	fillStrip(rgb_from_values(0, 0, 0));
 }
 
 bool setLEDStripMode(String mode) {
@@ -123,7 +177,7 @@ void handleLEDStrip() {
 			setLEDStripOff();
 			break;
 		case LEDSTRIP_RAINBOW:
-			setLEDStripRainbow(7,5);
+			setLEDStripRainbow();
 			break;
 		case LEDSTRIP_RUSSIAN:
 			setLEDStripRussian();
