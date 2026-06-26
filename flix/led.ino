@@ -14,7 +14,7 @@
 const int LED_OFF = 0, LED_ON = 1, LED_BLINK = 2;
 int led_mode = LED_OFF;
 
-#define LED_PIN     5      	// GPIO pin connected to Data In
+#define LED_PIN     6      	// GPIO pin connected to Data In
 #define NUM_LEDS    68      // Total number of LEDs
 #define BRIGHTNESS  64      // 0 to 255
 #define LED_TYPE    WS2812B

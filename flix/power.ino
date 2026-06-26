@@ -10,7 +10,7 @@
 
 float voltage = NAN;
 LowPassFilter<float> voltageFilter(0.2);
-int voltagePin = 6;
+int voltagePin = 5;
 float voltageScale = 2;
 
 void setupPower() {
