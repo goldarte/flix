@@ -8,7 +8,7 @@
 float motors[4]; // normalized motor thrusts in range [0..1]
 
 int motorPins[4] = {10, 11, 12, 13}; // default pin numbers
-int pwmFrequency = 40000;
+int pwmFrequency = 38023;
 int pwmResolution = 10;
 int pwmStop = 0;
 int pwmMin = 0;
