@@ -20,6 +20,7 @@ struct Parameter {
 	const char *name; // max length is 15
 	bool integer;
 	union { float *f; int *i; }; // pointer to the variable
+	float inital; // default value
 	float cache; // what's stored in flash
 	void (*callback)(); // called after parameter change
 	Parameter(const char *name, float *variable, void (*callback)() = nullptr) : name(name), integer(false), f(variable), callback(callback) {};
@@ -73,6 +74,8 @@ Parameter parameters[] = {
 	{"EST_ACC_WEIGHT", &accWeight},
 	{"EST_LVL_WEIGHT", &levelWeight},
 	{"EST_RATES_LPF_A", &ratesFilter.alpha},
+	{"EST_RATES_NF_F", &ratesNotch.frequency, setupEstimate},
+	{"EST_RATES_NF_BW", &ratesNotch.bandwidth, setupEstimate},
 	// led strip
 	{"LEDS_MODE", &ledstrip_mode},
 	// motors
@@ -122,6 +125,22 @@ Parameter parameters[] = {
 	{"MAV_RATE_RC", &telemetryRC.rate},
 	{"MAV_RATE_MOT", &telemetryMotors.rate},
 	{"MAV_RATE_IMU", &telemetryIMU.rate},
+	{"MAV_RATE_TOPIC", &telemetryTopic.rate},
+	// log
+	{"LOG_MEMORY", &logMemory, setupLog},
+	{"LOG_USAGE", &logUsage, setupLog},
+	{"LOG_RATE_000", &logTopics[0].throttle},
+	{"LOG_RATE_001", &logTopics[1].throttle},
+	{"LOG_RATE_002", &logTopics[2].throttle},
+	{"LOG_RATE_003", &logTopics[3].throttle},
+	{"LOG_RATE_004", &logTopics[4].throttle},
+	{"LOG_RATE_005", &logTopics[5].throttle},
+	{"LOG_RATE_006", &logTopics[6].throttle},
+	{"LOG_RATE_007", &logTopics[7].throttle},
+	{"LOG_RATE_008", &logTopics[8].throttle},
+	{"LOG_RATE_009", &logTopics[9].throttle},
+	{"LOG_RATE_010", &logTopics[10].throttle},
+	{"LOG_RATE_011", &logTopics[11].throttle},
 	// power
 	{"PWR_VOLT_PIN", &voltagePin, setupPower},
 	{"PWR_VOLT_SCALE", &voltageScale},
@@ -136,10 +155,10 @@ void setupParameters() {
 	storage.begin("flix");
 	// Read parameters from storage
 	for (auto &parameter : parameters) {
-		if (!storage.isKey(parameter.name)) {
-			storage.putFloat(parameter.name, parameter.getValue()); // store default value
+		parameter.inital = parameter.getValue();
+		if (storage.isKey(parameter.name)) {
+			parameter.setValue(storage.getFloat(parameter.name));
 		}
-		parameter.setValue(storage.getFloat(parameter.name, 0));
 		parameter.cache = parameter.getValue();
 	}
 }
@@ -185,8 +204,7 @@ void syncParameters() {
 	if (motorsActive()) return; // don't use flash while flying, it may cause a delay
 
 	for (auto &parameter : parameters) {
-		if (parameter.getValue() == parameter.cache) continue; // no change
-		if (isnan(parameter.getValue()) && isnan(parameter.cache)) continue; // both are NAN
+		if (floatEquals(parameter.getValue(), parameter.cache)) continue; // no change
 
 		storage.putFloat(parameter.name, parameter.getValue());
 		parameter.cache = parameter.getValue(); // update cache
@@ -194,9 +212,15 @@ void syncParameters() {
 }
 
 void printParameters(const char *filter) {
+	print("Name             Value          [Default]\n");
 	for (auto &parameter : parameters) {
 		if (strncasecmp(parameter.name, filter, strlen(filter))) continue;
-		print("%s = %g\n", parameter.name, parameter.getValue());
+
+		if (floatEquals(parameter.getValue(), parameter.inital)) { // parameter changed
+			print("%-15s  %-13g\n", parameter.name, parameter.getValue());
+		} else {
+			print("%-15s  %-13g  [%g]\n", parameter.name, parameter.getValue(), parameter.inital);
+		}
 	}
 }
 

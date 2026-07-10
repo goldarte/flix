@@ -9,7 +9,7 @@
 #include "quaternion.h"
 #include "Arduino.h"
 #include "wifi.h"
-#include "lpf.h"
+#include "filter.h"
 
 extern float t, dt;
 extern float controlRoll, controlPitch, controlYaw, controlThrottle, controlMode;
@@ -48,8 +48,17 @@ void normalizeRC();
 void calibrateRC();
 void calibrateRCChannel(int*, uint16_t[16], uint16_t[16], const char*);
 void printRCCalibration();
+void loopLog();
+void resetLog();
+void writeLog(const void *data, size_t size);
+void readLog(void *data, size_t position, size_t size);
+bool isTopicUpdated(const uint8_t topic);
+void printLogInfo();
+int estimateLogDuration();
 void printLogHeader();
-void printLogData();
+void printLogValues(const char *filter);
+void configLogThrottle(const char *name, float throttle);
+void exposeLogValue(const char *name);
 void processMavlink();
 void sendMavlink();
 void sendMessage(const void *msg);

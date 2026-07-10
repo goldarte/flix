@@ -6,7 +6,7 @@
 #include "pid.h"
 #include "vector.h"
 #include "util.h"
-#include "lpf.h"
+#include "filter.h"
 
 extern const int MOTOR_REAR_LEFT, MOTOR_REAR_RIGHT, MOTOR_FRONT_RIGHT, MOTOR_FRONT_LEFT;
 extern const int RAW, ACRO, STAB, AUTO;
@@ -54,6 +54,12 @@ const char* motd =
 "mot - show motor output\n"
 "log [dump] - print log header [and data]\n"
 "mfr, mfl, mrr, mrl - test motor (remove props)\n"
+"log - show log info\n"
+"log header - show log header\n"
+"log reset - reset log\n"
+"log <name> <rate> - setup log topic rate\n"
+"l <str> - show log values starting with str\n"
+"l expose <name> - expose log value to telemetry\n"
 "sys - show system info\n"
 "reset - reset drone's state\n"
 "reboot - reboot the drone\n";
@@ -164,9 +170,18 @@ void doCommand(String str, bool echo = false) {
 	} else if (command == "mot") {
 		print("front-right %g front-left %g rear-right %g rear-left %g\n",
 			motors[MOTOR_FRONT_RIGHT], motors[MOTOR_FRONT_LEFT], motors[MOTOR_REAR_RIGHT], motors[MOTOR_REAR_LEFT]);
-	} else if (command == "log") {
+	} else if (command == "log" && arg0 == "") {
+		printLogInfo();
+	} else if (command == "log" && arg1 != "") {
+		configLogThrottle(arg0.c_str(), arg1.toFloat());
+	} else if (command == "log" && arg0 == "header") {
 		printLogHeader();
-		if (arg0 == "dump") printLogData();
+	} else if (command == "log" && arg0 == "reset") {
+		resetLog();
+	} else if (command == "l" && arg0 == "expose" && arg1 != "") {
+		exposeLogValue(arg1.c_str());
+	} else if (command == "l") {
+		printLogValues(arg0.c_str());
 	} else if (command == "cr") {
 		calibrateRC();
 	} else if (command == "ca") {
@@ -185,6 +200,8 @@ void doCommand(String str, bool echo = false) {
 		print("Temperature: %.1f °C\n", temperatureRead());
 		print("Total RAM: %d KB\n", ESP.getHeapSize() / 1024);
 		print("Free heap: %d KB\n", ESP.getFreeHeap() / 1024);
+		print("PSRAM: %d KB\n", ESP.getPsramSize() / 1024);
+		print("Free PSRAM: %d KB\n", ESP.getFreePsram() / 1024);
 		print("Firmware: " __DATE__ " " __TIME__ "\n");
 		// Print tasks table
 		print("Num  Task                MinSt  Prio  Core  CPU%%\n");

@@ -23,7 +23,7 @@
 #include "estimate.ino"
 #include "safety.ino"
 #include "log.ino"
-#include "lpf.h"
+#include "filter.h"
 #include "mavlink.ino"
 #include "motors.ino"
 #include "parameters.ino"
@@ -55,6 +55,7 @@ public:
 		initNode();
 		Serial.begin(0);
 		setupParameters();
+		setupLog();
 		gzmsg << "Flix plugin loaded" << endl;
 	}
 

@@ -23,6 +23,12 @@ bool valid(float x) {
 	return isfinite(x);
 }
 
+bool floatEquals(float a, float b, float epsilon = 0) {
+	if (isnan(a) && isnan(b)) return true;
+	if (a == b) return true;
+	return fabsf(a - b) <= epsilon;
+}
+
 // Wrap angle to [-PI, PI)
 float wrapAngle(float angle) {
 	angle = fmodf(angle, 2 * PI);
@@ -56,6 +62,49 @@ public:
 		if (!success) lost++;
 		ESP_NOW_Serial_Class::onSent(true); // always report success to avoid resends
 	}
+};
+
+// Simple variant type for logging and parameters
+struct Value {
+	enum { EMPTY, FLOAT, INT, BOOL, FLOAT_FN, INT_FN, BOOL_FN } type;
+	union {
+		void *pointer;
+		float *_float;
+		int *_int;
+		bool *_bool;
+		float (*floatFn)();
+		int (*intFn)();
+		bool (*boolFn)();
+	};
+
+	Value() : type(EMPTY), pointer(nullptr) {};
+	Value(float *pt) : type(FLOAT), _float(pt) {};
+	Value(int *pt) : type(INT), _int(pt) {};
+	Value(bool *pt) : type(BOOL), _bool(pt) {};
+	Value(float (*fn)()) : type(FLOAT_FN), floatFn(fn) {};
+	Value(int (*fn)()) : type(INT_FN), intFn(fn) {};
+	Value(bool (*fn)()) : type(BOOL_FN), boolFn(fn) {};
+
+	float get() const {
+		switch (type) {
+			case FLOAT: return *_float;
+			case INT: return *_int;
+			case BOOL: return *_bool ? 1 : 0;
+			case FLOAT_FN: return floatFn();
+			case INT_FN: return intFn();
+			case BOOL_FN: return boolFn() ? 1 : 0;
+			default: return NAN;
+		}
+	};
+
+	void set(float value) const {
+		switch (type) {
+			case FLOAT: *_float = value; break;
+			case INT: *_int = value; break;
+			case BOOL: *_bool = (value != 0); break;
+			default: break;
+		}
+	};
 };
 
 // Rate limiter
