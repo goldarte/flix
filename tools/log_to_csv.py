@@ -13,7 +13,7 @@ import struct
 import csv
 
 DIR = os.path.dirname(os.path.realpath(__file__))
-HEADER_FILE = os.path.join(DIR, 'log/log_header.txt')
+HEADER_FILE = os.path.join(DIR, 'log_header.txt')
 
 # Read log header
 try:
@@ -56,7 +56,8 @@ while offset < len(data):
         offset += 1
 
         if topic >= len(topics):
-            raise ValueError(f'Invalid topic {topic} at offset {offset}')
+            # raise ValueError(f'Invalid topic {topic} at offset {offset}')
+            continue  # skip invalid topic
 
         if topic == 0 or not rows:
             rows.append({})
