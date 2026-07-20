@@ -34,8 +34,9 @@
 #define TILT_MAX radians(30)
 #define RATES_D_LPF_ALPHA 0.2 // cutoff frequency ~ 40 Hz
 
-const int RAW = 0, ACRO = 1, STAB = 2, AUTO = 3; // flight modes
+const int RAW = 0, ACRO = 1, STAB = 2, AUTO = 3, POS = 4; // flight modes
 int mode = STAB;
+int previousMode = STAB;
 bool armed = false;
 
 Quaternion attitudeTarget;
@@ -60,9 +61,13 @@ extern float controlRoll, controlPitch, controlThrottle, controlYaw, controlMode
 void control() {
 	interpretControls();
 	failsafe();
+	controlPosition();
+	controlVelocity();
+	controlAcceleration();
 	controlAttitude();
 	controlRates();
 	controlTorque();
+	previousMode = mode;
 }
 
 void interpretControls() {
@@ -71,6 +76,7 @@ void interpretControls() {
 	else if (controlMode > 0.75) mode = flightModes[2];
 
 	if (mode == AUTO) return; // pilot is not effective in AUTO mode
+	positionControlActive = mode == POS;
 
 	if (controlThrottle < 0.05 && controlYaw > 0.95) armed = true; // arm gesture
 	if (controlThrottle < 0.05 && controlYaw < -0.95) armed = false; // disarm gesture
@@ -84,6 +90,10 @@ void interpretControls() {
 		if (!armed || invalid(yawTarget) || controlYaw != 0) yawTarget = attitude.getYaw(); // reset yaw target
 		attitudeTarget = Quaternion::fromEuler(Vector(controlRoll * tiltMax, controlPitch * tiltMax, yawTarget));
 		ratesExtra = Vector(0, 0, -controlYaw * maxRate.z); // positive yaw stick means clockwise rotation in FLU
+	}
+
+	if (mode == POS) {
+		interpretPositionControls();
 	}
 
 	if (mode == ACRO) {
@@ -175,6 +185,7 @@ const char* getModeName() {
 		case ACRO: return "ACRO";
 		case STAB: return "STAB";
 		case AUTO: return "AUTO";
+		case POS: return "POS";
 		default: return "UNKNOWN";
 	}
 }

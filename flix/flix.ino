@@ -12,6 +12,8 @@ extern float controlRoll, controlPitch, controlYaw, controlThrottle, controlMode
 extern Vector gyro, acc;
 extern Vector rates;
 extern Quaternion attitude;
+extern Vector position, velocity;
+extern bool positionControlActive;
 extern bool landed;
 extern float motors[4];
 

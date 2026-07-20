@@ -269,7 +269,7 @@ When finished flying, **disarm** the drone, moving the left stick to the bottom 
 
 ### Flight modes
 
-Flight mode is changed using mode switch on the remote control (if configured) or using the console commands. The main flight mode is *STAB*. In order to change modes using SBUS remote control, set the parameters: `CTL_FLT_MODE_0`, `CTL_FLT_MODE_1`, and `CTL_FLT_MODE_2` to required mode numbers (0 for *RAW*, 1 for *ACRO*, 2 for *STAB*, 3 for *AUTO*).
+Flight mode is changed using mode switch on the remote control (if configured) or using the console commands. The main flight mode is *STAB*. In order to change modes using SBUS remote control, set the parameters: `CTL_FLT_MODE_0`, `CTL_FLT_MODE_1`, and `CTL_FLT_MODE_2` to required mode numbers (0 for *RAW*, 1 for *ACRO*, 2 for *STAB*, 3 for *AUTO*, 4 for *POS*).
 
 #### STAB
 
@@ -285,6 +285,10 @@ In this mode, the pilot controls the angular rates. This control method is diffi
 #### RAW
 
 *RAW* mode disables all the stabilization, and the pilot inputs are mixed directly to the motors. The IMU sensor is not involved. This mode is intended for testing and demonstration purposes only, and basically the drone **cannot fly in this mode**.
+
+#### POS
+
+In this mode, the drone holds position using an external estimate supplied with MAVLink `ODOMETRY` messages. Roll and pitch command horizontal velocity, throttle commands vertical velocity around its center position, and yaw commands yaw rate. If odometry is missing or stale, the controller falls back to *STAB* before takeoff and starts the automatic descent failsafe in flight.
 
 #### AUTO
 

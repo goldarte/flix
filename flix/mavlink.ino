@@ -16,9 +16,42 @@ Rate telemetryAttitude(20);
 Rate telemetryRC(10);
 Rate telemetryMotors(10);
 Rate telemetryIMU(15);
+Rate telemetryPosition(10);
 
 bool mavlinkConnected = false;
 String mavlinkPrintBuffer;
+
+bool decodeOdometryAttitude(const mavlink_odometry_t& odometry, Quaternion& result) {
+	bool bodyFrame = odometry.child_frame_id == MAV_FRAME_BODY_NED ||
+		odometry.child_frame_id == MAV_FRAME_BODY_OFFSET_NED ||
+		odometry.child_frame_id == MAV_FRAME_BODY_FRD;
+	if (!bodyFrame) return false;
+
+	Quaternion raw(odometry.q[0], odometry.q[1], odometry.q[2], odometry.q[3]);
+	float norm = raw.norm();
+	if (!isfinite(norm) || norm < 1e-6f) return false;
+	raw.normalize();
+
+	// MAVLink body frames are FRD. Rotate both the local and body axes into
+	// Flix's internal FLU convention. ENU also needs a -90 degree local yaw.
+	Quaternion frdToFlu(0, 1, 0, 0);
+	switch (odometry.frame_id) {
+		case MAV_FRAME_LOCAL_NED:
+		case MAV_FRAME_LOCAL_FRD:
+			result = frdToFlu * raw * frdToFlu;
+			break;
+		case MAV_FRAME_LOCAL_ENU:
+			result = Quaternion::fromEuler(Vector(0, 0, -PI / 2)) * raw * frdToFlu;
+			break;
+		case MAV_FRAME_LOCAL_FLU:
+			result = raw * frdToFlu;
+			break;
+		default:
+			return false;
+	}
+	result.normalize();
+	return result.finite();
+}
 
 void processMavlink() {
 	sendMavlink();
@@ -34,7 +67,7 @@ void sendMavlink() {
 	if (telemetrySlow) {
 		mavlink_msg_heartbeat_pack(mavlinkSysId, MAV_COMP_ID_AUTOPILOT1, &msg, MAV_TYPE_QUADROTOR, MAV_AUTOPILOT_GENERIC,
 			(armed ? MAV_MODE_FLAG_SAFETY_ARMED : 0) |
-			((mode == STAB) ? MAV_MODE_FLAG_STABILIZE_ENABLED : 0) |
+			((mode == STAB || mode == POS) ? MAV_MODE_FLAG_STABILIZE_ENABLED : 0) |
 			((mode == AUTO) ? MAV_MODE_FLAG_AUTO_ENABLED : MAV_MODE_FLAG_MANUAL_INPUT_ENABLED),
 			mode, MAV_STATE_STANDBY);
 		sendMessage(&msg);
@@ -84,6 +117,12 @@ void sendMavlink() {
 			0, 0, 0, 0);
 		sendMessage(&msg);
 	}
+
+	if (telemetryPosition && odometryValid()) {
+		mavlink_msg_local_position_ned_pack(mavlinkSysId, MAV_COMP_ID_AUTOPILOT1, &msg, time,
+			position.x, -position.y, -position.z, velocity.x, -velocity.y, -velocity.z);
+		sendMessage(&msg);
+	}
 }
 
 void sendMessage(const void *msg) {
@@ -121,6 +160,71 @@ void handleMavlink(const void *_msg) {
 		controlYaw = m.r / 1000.0f;
 		controlMode = NAN;
 		controlTime = t;
+	}
+
+	if (msg.msgid == MAVLINK_MSG_ID_ODOMETRY) {
+		mavlink_odometry_t m;
+		mavlink_msg_odometry_decode(&msg, &m);
+		if (m.quality < 0) {
+			position.invalidate();
+			velocity.invalidate();
+			odometryAttitude.invalidate();
+			return;
+		}
+		Quaternion newAttitude;
+		bool attitudeSupported = decodeOdometryAttitude(m, newAttitude);
+
+		Vector newPosition;
+		bool positionSupported = true;
+		switch (m.frame_id) {
+			case MAV_FRAME_LOCAL_NED:
+			case MAV_FRAME_LOCAL_FRD:
+				newPosition = Vector(m.x, -m.y, -m.z);
+				break;
+			case MAV_FRAME_LOCAL_ENU:
+				newPosition = Vector(m.y, -m.x, m.z);
+				break;
+			case MAV_FRAME_LOCAL_FLU:
+				newPosition = Vector(m.x, m.y, m.z);
+				break;
+			default:
+				positionSupported = false;
+		}
+
+		Vector newVelocity;
+		bool velocitySupported = true;
+		switch (m.child_frame_id) {
+			case MAV_FRAME_LOCAL_NED:
+			case MAV_FRAME_LOCAL_FRD:
+				newVelocity = Vector(m.vx, -m.vy, -m.vz);
+				break;
+			case MAV_FRAME_LOCAL_ENU:
+				newVelocity = Vector(m.vy, -m.vx, m.vz);
+				break;
+			case MAV_FRAME_LOCAL_FLU:
+				newVelocity = Vector(m.vx, m.vy, m.vz);
+				break;
+			case MAV_FRAME_BODY_NED:
+			case MAV_FRAME_BODY_FRD:
+			case MAV_FRAME_BODY_OFFSET_NED:
+				newVelocity = (attitudeSupported ? newAttitude : attitude).conjugate(
+					Vector(m.vx, -m.vy, -m.vz));
+				break;
+			default:
+				velocitySupported = false;
+		}
+
+		if (positionSupported && velocitySupported && newPosition.finite() && newVelocity.finite()) {
+			position = newPosition;
+			velocity = newVelocity;
+			if (attitudeSupported) {
+				odometryAttitude = newAttitude;
+				attitude = newAttitude;
+			} else {
+				odometryAttitude.invalidate();
+			}
+			odometryTime = t;
+		}
 	}
 
 	if (msg.msgid == MAVLINK_MSG_ID_PARAM_REQUEST_LIST) {
@@ -195,6 +299,7 @@ void handleMavlink(const void *_msg) {
 		mavlink_set_attitude_target_t m;
 		mavlink_msg_set_attitude_target_decode(&msg, &m);
 		if (m.target_system && m.target_system != mavlinkSysId) return;
+		positionControlActive = false;
 
 		// copy attitude, rates and thrust targets
 		ratesTarget.x = m.body_roll_rate;
@@ -211,12 +316,54 @@ void handleMavlink(const void *_msg) {
 		armed = m.thrust > 0;
 	}
 
+	if (msg.msgid == MAVLINK_MSG_ID_SET_POSITION_TARGET_LOCAL_NED) {
+		if (mode != AUTO) return;
+
+		mavlink_set_position_target_local_ned_t m;
+		mavlink_msg_set_position_target_local_ned_decode(&msg, &m);
+		if (m.target_system && m.target_system != mavlinkSysId) return;
+		if (m.target_component && m.target_component != MAV_COMP_ID_AUTOPILOT1) return;
+		if (!odometryValid()) return;
+
+		bool bodyFrame = m.coordinate_frame == MAV_FRAME_BODY_NED || m.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED;
+		bool offsetFrame = m.coordinate_frame == MAV_FRAME_LOCAL_OFFSET_NED || m.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED;
+		if (m.coordinate_frame != MAV_FRAME_LOCAL_NED && !bodyFrame && !offsetFrame) return;
+		positionControlActive = true;
+
+		Vector positionCommand(m.x, -m.y, -m.z);
+		Vector velocityCommand(m.vx, -m.vy, -m.vz);
+		Vector accelerationCommand(m.afx, -m.afy, -m.afz);
+		if (bodyFrame) {
+			velocityCommand = attitude.conjugate(velocityCommand);
+			accelerationCommand = attitude.conjugate(accelerationCommand);
+		}
+		if (m.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED) {
+			positionCommand = attitude.conjugate(positionCommand);
+		}
+
+		positionTarget.x = m.type_mask & POSITION_TARGET_TYPEMASK_X_IGNORE ? NAN : positionCommand.x + (offsetFrame ? position.x : 0);
+		positionTarget.y = m.type_mask & POSITION_TARGET_TYPEMASK_Y_IGNORE ? NAN : positionCommand.y + (offsetFrame ? position.y : 0);
+		positionTarget.z = m.type_mask & POSITION_TARGET_TYPEMASK_Z_IGNORE ? NAN : positionCommand.z + (offsetFrame ? position.z : 0);
+		velocityTarget.x = m.type_mask & POSITION_TARGET_TYPEMASK_VX_IGNORE ? NAN : velocityCommand.x;
+		velocityTarget.y = m.type_mask & POSITION_TARGET_TYPEMASK_VY_IGNORE ? NAN : velocityCommand.y;
+		velocityTarget.z = m.type_mask & POSITION_TARGET_TYPEMASK_VZ_IGNORE ? NAN : velocityCommand.z;
+		bool forceSet = m.type_mask & POSITION_TARGET_TYPEMASK_FORCE_SET;
+		accelerationTarget.x = forceSet || (m.type_mask & POSITION_TARGET_TYPEMASK_AX_IGNORE) ? NAN : accelerationCommand.x;
+		accelerationTarget.y = forceSet || (m.type_mask & POSITION_TARGET_TYPEMASK_AY_IGNORE) ? NAN : accelerationCommand.y;
+		accelerationTarget.z = forceSet || (m.type_mask & POSITION_TARGET_TYPEMASK_AZ_IGNORE) ? NAN : accelerationCommand.z;
+		bool yawIgnored = m.type_mask & POSITION_TARGET_TYPEMASK_YAW_IGNORE;
+		bool yawRateIgnored = m.type_mask & POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE;
+		positionYawTarget = yawIgnored ? (yawRateIgnored ? attitude.getYaw() : NAN) : -m.yaw;
+		positionYawRateTarget = yawRateIgnored ? 0 : -m.yaw_rate;
+	}
+
 	if (msg.msgid == MAVLINK_MSG_ID_SET_ACTUATOR_CONTROL_TARGET) {
 		if (mode != AUTO) return;
 
 		mavlink_set_actuator_control_target_t m;
 		mavlink_msg_set_actuator_control_target_decode(&msg, &m);
 		if (m.target_system && m.target_system != mavlinkSysId) return;
+		positionControlActive = false;
 
 		attitudeTarget.invalidate();
 		ratesTarget.invalidate();
@@ -250,7 +397,8 @@ void handleMavlink(const void *_msg) {
 		if (m.command == MAV_CMD_REQUEST_MESSAGE && m.param1 == MAVLINK_MSG_ID_AUTOPILOT_VERSION) {
 			accepted = true;
 			mavlink_msg_autopilot_version_pack(mavlinkSysId, MAV_COMP_ID_AUTOPILOT1, &response,
-				MAV_PROTOCOL_CAPABILITY_PARAM_FLOAT | MAV_PROTOCOL_CAPABILITY_MAVLINK2, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0);
+				MAV_PROTOCOL_CAPABILITY_PARAM_FLOAT | MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED | MAV_PROTOCOL_CAPABILITY_MAVLINK2,
+				1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0);
 			sendMessage(&response);
 		}
 
@@ -261,7 +409,7 @@ void handleMavlink(const void *_msg) {
 		}
 
 		if (m.command == MAV_CMD_DO_SET_MODE) {
-			if (m.param2 < 0 || m.param2 > AUTO) return; // incorrect mode
+			if (m.param2 < 0 || m.param2 > POS) return; // incorrect mode
 			accepted = true;
 			mode = m.param2;
 		}

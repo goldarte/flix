@@ -59,6 +59,21 @@ Parameter parameters[] = {
 	{"CTL_FLT_MODE_0", &flightModes[0]},
 	{"CTL_FLT_MODE_1", &flightModes[1]},
 	{"CTL_FLT_MODE_2", &flightModes[2]},
+	{"CTL_POS_X_P", &positionXPID.p},
+	{"CTL_POS_Y_P", &positionYPID.p},
+	{"CTL_POS_Z_P", &positionZPID.p},
+	{"CTL_VEL_X_P", &velocityXPID.p},
+	{"CTL_VEL_X_I", &velocityXPID.i},
+	{"CTL_VEL_X_D", &velocityXPID.d},
+	{"CTL_VEL_Y_P", &velocityYPID.p},
+	{"CTL_VEL_Y_I", &velocityYPID.i},
+	{"CTL_VEL_Y_D", &velocityYPID.d},
+	{"CTL_VEL_Z_P", &velocityZPID.p},
+	{"CTL_VEL_Z_I", &velocityZPID.i},
+	{"CTL_VEL_Z_D", &velocityZPID.d},
+	{"CTL_VEL_MAX_XY", &velocityMaxXY},
+	{"CTL_VEL_MAX_Z", &velocityMaxZ},
+	{"CTL_HOVER_THR", &hoverThrust},
 	// imu
 	{"IMU_ROT_ROLL", &imuRotation.x},
 	{"IMU_ROT_PITCH", &imuRotation.y},
@@ -121,6 +136,7 @@ Parameter parameters[] = {
 	{"MAV_RATE_RC", &telemetryRC.rate},
 	{"MAV_RATE_MOT", &telemetryMotors.rate},
 	{"MAV_RATE_IMU", &telemetryIMU.rate},
+	{"MAV_RATE_POS", &telemetryPosition.rate},
 	// power
 	{"PWR_VOLT_PIN", &voltagePin, setupPower},
 	{"PWR_VOLT_SCALE", &voltageScale},
@@ -128,6 +144,7 @@ Parameter parameters[] = {
 	// safety
 	{"SF_RC_LOSS_TIME", &rcLossTimeout},
 	{"SF_DESCEND_TIME", &descendTime},
+	{"SF_ODOM_TIMEOUT", &odometryTimeout},
 };
 
 void setupParameters() {

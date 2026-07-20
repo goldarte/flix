@@ -9,7 +9,7 @@
 #include "lpf.h"
 
 extern const int MOTOR_REAR_LEFT, MOTOR_REAR_RIGHT, MOTOR_FRONT_RIGHT, MOTOR_FRONT_LEFT;
-extern const int RAW, ACRO, STAB, AUTO;
+extern const int RAW, ACRO, STAB, AUTO, POS;
 extern const int W_AP, W_STA, W_ESPNOW;
 extern float t, dt, loopRate;
 extern uint16_t channels[16];
@@ -40,7 +40,7 @@ const char* motd =
 "st - show state estimation\n"
 "arm - arm the drone\n"
 "disarm - disarm the drone\n"
-"raw/stab/acro/auto - set mode\n"
+"raw/stab/acro/pos/auto - set mode\n"
 "rc - show RC data\n"
 "cr - calibrate RC\n"
 "pw - show power info\n"
@@ -115,6 +115,8 @@ void doCommand(String str, bool echo = false) {
 		print("rates: %g %g %g\n", rates.x, rates.y, rates.z);
 		print("attitude: %g %g %g %g\n", attitude.w, attitude.x, attitude.y, attitude.z);
 		print("roll: %g° pitch: %g° yaw: %g°\n", degrees(attitude.getRoll()), degrees(attitude.getPitch()), degrees(attitude.getYaw()));
+		print("position: %g %g %g\n", position.x, position.y, position.z);
+		print("velocity: %g %g %g\n", velocity.x, velocity.y, velocity.z);
 		print("landed: %d\n", landed);
 	} else if (command == "arm") {
 		armed = true;
@@ -128,6 +130,8 @@ void doCommand(String str, bool echo = false) {
 		mode = ACRO;
 	} else if (command == "auto") {
 		mode = AUTO;
+	} else if (command == "pos") {
+		mode = POS;
 	} else if (command == "rc") {
 		print("channels: ");
 		for (int i = 0; i < 16; i++) {

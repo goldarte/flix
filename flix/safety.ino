@@ -11,7 +11,14 @@ float descendTime = 10;
 
 void failsafe() {
 	rcLossFailsafe();
+	odometryLossFailsafe();
 	autoFailsafe();
+}
+
+void odometryLossFailsafe() {
+	if (!armed || !positionControlActive || odometryValid()) return;
+	positionControlActive = false;
+	descend();
 }
 
 // RC loss failsafe

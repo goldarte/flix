@@ -27,7 +27,7 @@
 * Precise simulation with Gazebo.
 * Python library for scripting and automatic flights.
 * Textbook on flight control theory and practice ([in development](https://quadcopter.dev)).
-* *Position control (planned)*.
+* Position control using external odometry.
 
 ## It actually flies
 

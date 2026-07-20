@@ -46,7 +46,7 @@ Pilot inputs are interpreted in `interpretControls()`, and then converted to the
 * `torqueTarget` *(Vector)* — target torque, range [-1, 1].
 * `thrustTarget` *(float)* — collective motor thrust target, range [0, 1].
 
-Control command is handled in `controlAttitude()`, `controlRates()`, `controlTorque()` functions. Each function may be skipped if the corresponding control target is set to `NAN`.
+Control command is handled in `controlPosition()`, `controlVelocity()`, `controlAcceleration()`, `controlAttitude()`, `controlRates()`, and `controlTorque()` functions. Each stage may be skipped if its control mode or target is inactive. Position, velocity, and attitude feedback are provided externally using the MAVLink `ODOMETRY` message. Its quaternion supplies the heading used by position and automatic yaw control.
 
 <img src="img/control.svg" width=300 alt="Control subsystem diagram">
 
