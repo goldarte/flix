@@ -173,6 +173,16 @@ Setting angular rates target:
 flix.set_rates([0.1, 0.2, 0.3], 0.6)  # set target roll rate, pitch rate, yaw rate and thrust
 ```
 
+With a current external odometry stream, set a position or velocity target in the local FLU frame:
+
+```python
+flix.set_armed(True)  # position targets do not arm automatically
+flix.set_position([1, 0, 1], yaw=0, wait=True)
+flix.set_velocity([0.5, 0, 0])
+```
+
+The position source must send MAVLink `ODOMETRY` continuously (10 Hz or faster is recommended). Local NED/FRD/ENU/FLU pose frames, body attitude quaternions, and local or body velocity frames are converted to Flix's internal FLU frame. Position targets with `yaw` hold both position and heading. The default odometry timeout is 0.5 seconds and can be changed using `SF_ODOM_TIMEOUT`.
+
 You also can control raw motor outputs directly:
 
 ```python
@@ -184,11 +194,6 @@ In *AUTO* mode, the drone will arm automatically if the thrust is greater than z
 ```python
 flix.set_attitude([0, 0, 0], 0)  # disarm the drone
 ```
-
-The following methods are in development and are not functional yet:
-
-* `set_position` — set target position.
-* `set_velocity` — set target velocity.
 
 To exit *AUTO* mode move control sticks and the drone will switch to *STAB* mode.
 

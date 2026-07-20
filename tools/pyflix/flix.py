@@ -31,6 +31,8 @@ class Flix:
     attitude: List[float]
     attitude_euler: List[float]  # roll, pitch, yaw
     rates: List[float]
+    position: List[float]
+    velocity: List[float]
     channels: List[int]
     motors: List[float]
     acc: List[float]
@@ -42,7 +44,7 @@ class Flix:
 
     _connection_timeout = 3
     _print_buffer: str = ''
-    _modes = ['RAW', 'ACRO', 'STAB', 'AUTO']
+    _modes = ['RAW', 'ACRO', 'STAB', 'AUTO', 'POS']
 
     def __init__(self, system_id: int=1, wait_connection: bool=True, device=os.getenv('FLIX_DEVICE')):
         if not (0 <= system_id < 256):
@@ -81,6 +83,8 @@ class Flix:
         self.attitude = [1, 0, 0, 0]
         self.attitude_euler = [0, 0, 0]
         self.rates = [0, 0, 0]
+        self.position = [math.nan, math.nan, math.nan]
+        self.velocity = [math.nan, math.nan, math.nan]
         self.channels = [0, 0, 0, 0, 0, 0, 0, 0]
         self.motors = [0, 0, 0, 0]
         self.acc = [0, 0, 0]
@@ -176,6 +180,12 @@ class Flix:
             self.attitude_euler = list(Quaternion(self.attitude).euler)  # type: ignore
             self._trigger('attitude', self.attitude)
             self._trigger('attitude_euler', self.attitude_euler)
+
+        if isinstance(msg, mavlink.MAVLink_local_position_ned_message):
+            self.position = self._mavlink_to_flu([msg.x, msg.y, msg.z])
+            self.velocity = self._mavlink_to_flu([msg.vx, msg.vy, msg.vz])
+            self._trigger('position', self.position)
+            self._trigger('velocity', self.velocity)
 
         if isinstance(msg, mavlink.MAVLink_rc_channels_raw_message):
             self.channels = [msg.chan1_raw, msg.chan2_raw, msg.chan3_raw, msg.chan4_raw,
@@ -321,10 +331,54 @@ class Flix:
         self._command_send(mavlink.MAV_CMD_COMPONENT_ARM_DISARM, (1 if armed else 0, 0, 0, 0, 0, 0, 0))
 
     def set_position(self, position: List[float], yaw: Optional[float] = None, wait: bool = False, tolerance: float = 0.1):
-        raise NotImplementedError('Position control is not implemented yet')
+        if len(position) != 3:
+            raise ValueError('Position must be [x, y, z]')
+        if tolerance <= 0:
+            raise ValueError('Tolerance must be greater than zero')
+        target = list(position)
+        position = self._flu_to_mavlink(position)
+        type_mask = (mavlink.POSITION_TARGET_TYPEMASK_VX_IGNORE |
+                     mavlink.POSITION_TARGET_TYPEMASK_VY_IGNORE |
+                     mavlink.POSITION_TARGET_TYPEMASK_VZ_IGNORE |
+                     mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE |
+                     mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE |
+                     mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE |
+                     mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE)
+        if yaw is None:
+            type_mask |= mavlink.POSITION_TARGET_TYPEMASK_YAW_IGNORE
+            yaw = 0
+        else:
+            yaw = -yaw
+        for _ in range(2):
+            self.mavlink.set_position_target_local_ned_send(
+                0, self.system_id, 0, mavlink.MAV_FRAME_LOCAL_NED, type_mask,
+                position[0], position[1], position[2], 0, 0, 0, 0, 0, 0, yaw, 0)
+        if wait:
+            def reached(value: List[float]) -> bool:
+                return math.sqrt(sum((value[i] - target[i]) ** 2 for i in range(3))) <= tolerance
+            if not reached(self.position):
+                self.wait('position', reached)
 
     def set_velocity(self, velocity: List[float], yaw: Optional[float] = None):
-        raise NotImplementedError('Velocity control is not implemented yet')
+        if len(velocity) != 3:
+            raise ValueError('Velocity must be [vx, vy, vz]')
+        velocity = self._flu_to_mavlink(velocity)
+        type_mask = (mavlink.POSITION_TARGET_TYPEMASK_X_IGNORE |
+                     mavlink.POSITION_TARGET_TYPEMASK_Y_IGNORE |
+                     mavlink.POSITION_TARGET_TYPEMASK_Z_IGNORE |
+                     mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE |
+                     mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE |
+                     mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE |
+                     mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE)
+        if yaw is None:
+            type_mask |= mavlink.POSITION_TARGET_TYPEMASK_YAW_IGNORE
+            yaw = 0
+        else:
+            yaw = -yaw
+        for _ in range(2):
+            self.mavlink.set_position_target_local_ned_send(
+                0, self.system_id, 0, mavlink.MAV_FRAME_LOCAL_NED, type_mask,
+                0, 0, 0, velocity[0], velocity[1], velocity[2], 0, 0, 0, yaw, 0)
 
     def set_attitude(self, attitude: List[float], thrust: float):
         if len(attitude) == 3:
