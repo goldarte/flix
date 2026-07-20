@@ -21,6 +21,7 @@
 #include "cli.ino"
 #include "control.ino"
 #include "estimate.ino"
+#include "navigation.ino"
 #include "safety.ino"
 #include "log.ino"
 #include "lpf.h"
@@ -43,6 +44,7 @@ private:
 	event::ConnectionPtr updateConnection, resetConnection;
 	transport::NodePtr nodeHandle;
 	transport::PublisherPtr motorPub[4];
+	transport::PublisherPtr groundTruthPub;
 	LowPassFilter<Vector> accFilter = LowPassFilter<Vector>(0.1);
 
 public:
@@ -61,6 +63,10 @@ public:
 
 	void OnReset() {
 		attitude = Quaternion(); // reset estimated attitude
+		position.invalidate();
+		velocity.invalidate();
+		odometryAttitude.invalidate();
+		positionControlActive = false;
 		armed = false;
 		__resetTime += __micros;
 		gzmsg << "Flix plugin reset" << endl;
@@ -78,9 +84,6 @@ public:
 
 		readRC();
 		estimate();
-
-		// correct yaw to the actual yaw
-		attitude.setYaw(this->model->WorldPose().Yaw());
 
 		control();
 		handleInput();
@@ -125,6 +128,7 @@ public:
 		motorPub[1] = nodeHandle->Advertise<msgs::Int>(ns + "/motor1");
 		motorPub[2] = nodeHandle->Advertise<msgs::Int>(ns + "/motor2");
 		motorPub[3] = nodeHandle->Advertise<msgs::Int>(ns + "/motor3");
+		groundTruthPub = nodeHandle->Advertise<msgs::Pose>(ns + "/ground_truth");
 	}
 
 	void publishTopics() {
@@ -132,6 +136,24 @@ public:
 			msgs::Int msg;
 			msg.set_data(static_cast<int>(round(motors[i] * 1000)));
 			motorPub[i]->Publish(msg);
+		}
+
+		static Rate groundTruthRate(30);
+		if (groundTruthRate) {
+			const ignition::math::Pose3d pose = body->WorldPose();
+			const Vector3d position = pose.Pos();
+			const ignition::math::Quaterniond orientation = pose.Rot();
+			msgs::Pose msg;
+			msgs::Vector3d *positionMsg = msg.mutable_position();
+			positionMsg->set_x(position.X());
+			positionMsg->set_y(position.Y());
+			positionMsg->set_z(position.Z());
+			msgs::Quaternion *orientationMsg = msg.mutable_orientation();
+			orientationMsg->set_w(orientation.W());
+			orientationMsg->set_x(orientation.X());
+			orientationMsg->set_y(orientation.Y());
+			orientationMsg->set_z(orientation.Z());
+			groundTruthPub->Publish(msg);
 		}
 	}
 };

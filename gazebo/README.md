@@ -90,6 +90,16 @@ To disarm, move the throttle stick to the bottom left position:
 
 See other piloting and usage details in general [usage article](../docs/usage.md).
 
+### Position control test
+
+With the simulator running, execute the external-odometry position-control test in another terminal:
+
+```bash
+python3 tools/test_position.py
+```
+
+The script connects to the Gazebo master at `http://127.0.0.1:11345`, streams the simulator ground-truth pose to Flix as MAVLink `ODOMETRY`, switches to *AUTO*, takes off, flies a square while holding its initial yaw, returns to its starting point, and lands. Run `python3 tools/test_position.py --help` to configure the path, position and yaw tolerances, timeouts, Gazebo topic, or MAVLink connection.
+
 ## Code structure
 
 Flix simulator consists of the following components:
