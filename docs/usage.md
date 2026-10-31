@@ -1,20 +1,48 @@
 # Usage: build, setup and flight
 
-To fly Flix quadcopter, you need to build the firmware, upload it to the ESP32 board, and set up the drone for flight.
+To fly Flix quadcopter, you need to upload the firmware to the ESP32 board, and set up the drone for flight.
 
-To get the firmware sources, clone the repository using git:
+## Uploading the firmware
+
+You can either use the **prebuilt binaries** or **build the firmware** from sources — this will let you modify the firmware and add new features.
+
+### Prebuilt binaries (the easiest way)
+
+1. Download the latest firmware file using the following links:
+
+   <!-- markdownlint-disable MD044 -->
+   |Type|Boards|Link|
+   |-|-|-|
+   |ESP32|DevKit, D1 Mini|[`quadcopter.dev/flix.esp32.merged.bin`](https://quadcopter.dev/flix.esp32.merged.bin)|
+   |ESP32-S3|Most S3 based|[`quadcopter.dev/flix.esp32s3.merged.bin`](https://quadcopter.dev/flix.esp32s3.merged.bin)|
+   |ESP32-S3 (2MB PSRAM)|S3 Super Mini, S3 Zero (2MB PSRAM)|[`quadcopter.dev/flix.esp32s3.qspi.merged.bin`](https://quadcopter.dev/flix.esp32s3.qspi.merged.bin)|
+   |ESP32-S3 (8/16MB PSRAM)|S3 Zero (8MB PSRAM)|[`quadcopter.dev/flix.esp32s3.opi.merged.bin`](https://quadcopter.dev/flix.esp32s3.opi.merged.bin)|
+   |ESP32-C3|C3 Super Mini|[`quadcopter.dev/flix.esp32c3.merged.bin`](https://quadcopter.dev/flix.esp32c3.merged.bin)|
+   |Flix2|Flix2 board|[`quadcopter.dev/flix.flix2.merged.bin`](https://quadcopter.dev/flix.flix2.merged.bin)|
+   <!-- markdownlint-enable MD044 -->
+
+2. Flash your ESP32 board using [ESP32 Web Flasher](https://www.espboards.dev/tools/program/):
+
+   <img src="img/web-flasher.png" width="400">
+
+   * Connect the board to your computer, press *Connect to ESP*, choose the serial port.
+   * Go to the *Flash* tab.
+   * Choose the downloaded firmware file, set *Flash address* to *0* (important).
+   * Click *Program* button and wait until the process is finished.
+
+### Building from sources (flexible)
+
+You can build and upload the firmware using either **Arduino IDE** (easier for beginners) or **command line**.
+
+Get the sources using git:
 
 ```bash
 git clone https://github.com/okalachev/flix.git && cd flix
 ```
 
-Beginners can [download the source code as a ZIP archive](https://github.com/okalachev/flix/archive/refs/heads/master.zip).
+Beginners can [download the sources as a ZIP archive](https://github.com/okalachev/flix/archive/refs/heads/master.zip).
 
-## Building the firmware
-
-You can build and upload the firmware using either **Arduino IDE** (easier for beginners) or **command line**.
-
-### Arduino IDE (Windows, Linux, macOS)
+#### Arduino IDE (Windows, Linux, macOS)
 
 <img src="img/arduino-ide.png" width="400" alt="Flix firmware open in Arduino IDE">
 
@@ -23,13 +51,13 @@ You can build and upload the firmware using either **Arduino IDE** (easier for b
 3. Install ESP32 core, version 3.3.10. See the [official Espressif's instructions](https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html#installing-using-arduino-ide) on installing ESP32 Core in Arduino IDE.
 4. Install the following libraries using [Library Manager](https://docs.arduino.cc/software/ide-v2/tutorials/ide-v2-installing-a-library):
    * `FlixPeriph`, the latest version.
-   * `MAVLink`, version 2.0.25.
+   * `MAVLink`, version 2.0.33.
 5. Open the `flix/flix.ino` sketch from downloaded firmware sources in Arduino IDE.
-6. Connect your ESP32 board to the computer and choose correct board type in Arduino IDE (*WEMOS D1 MINI ESP32* for ESP32 Mini) and the port.
+6. Connect your ESP32 board to the computer and choose correct board type in Arduino IDE (*WEMOS D1 MINI ESP32* for ESP32 Mini, *ESP32S3 Dev Module* for ESP32-S3 Super Mini) and the port.
 7. Set *Tools* ⇒ *Core Debug Level* to *Error* to see the errors in the serial console. Set *Tools* ⇒ *USB CDC on Boot* to *Enabled* for ESP32-S3/ESP32-C3 boards.
 8. [Build and upload](https://docs.arduino.cc/software/ide-v2/tutorials/getting-started/ide-v2-uploading-a-sketch) the firmware using Arduino IDE.
 
-### Command line (Windows, Linux, macOS)
+#### Command line (Windows, Linux, macOS)
 
 1. [Install Arduino CLI](https://arduino.github.io/arduino-cli/installation/).
 
@@ -58,27 +86,22 @@ You can build and upload the firmware using either **Arduino IDE** (easier for b
    make upload monitor
    ```
 
-   For ESP32-S3/ESP32-C3 boards, set the appropriate [FQBN](https://docs.arduino.cc/arduino-cli/FAQ/#whats-the-fqbn-string) using `BOARD` parameter:
+   Specify the [target board](../Makefile) using the `TARGET` variable, for example:
 
    ```bash
-   make BOARD=esp32:esp32:esp32s3:DebugLevel=error,FlashSize=4M,CDCOnBoot=cdc upload
+   make TARGET=esp32s3
    ```
 
-See other available Make commands in [Makefile](../Makefile).
+   You can build the firmware with a custom [FQBN string](https://docs.arduino.cc/arduino-cli/FAQ/#whats-the-fqbn-string) like this:
+
+   ```bash
+   make FQBN=esp32:esp32:esp32s3:DebugLevel=error,CDCOnBoot=cdc
+   ```
 
 > [!TIP]
 > You can test the firmware on a bare ESP32 board without connecting IMU and other peripherals. The Wi-Fi network `flix` should appear and all the basic functionality including console and QGroundControl connection should work.
 
 ## Before first flight
-
-### Choose the IMU model
-
-In case if using different IMU model than MPU9250, change `imu` variable declaration in the `imu.ino`:
-
-```cpp
-ICM20948 imu(SPI);  // For ICM-20948
-MPU6050 imu(Wire);  // For MPU-6050
-```
 
 ### Connect using QGroundControl
 
@@ -105,7 +128,7 @@ To access the console using serial port:
 To access the console using QGroundControl:
 
 1. Connect to the drone using QGroundControl app.
-2. Go to the QGroundControl menu ⇒ *Vehicle Setup* ⇒ *Analyze Tools* ⇒ *MAVLink Console*.
+2. Go to the QGroundControl menu ⇒ *Analyze Tools* ⇒ *MAVLink Console*.
 
 <img src="img/cli.png" width="400">
 
@@ -119,6 +142,17 @@ The drone is configured using parameters. To access and modify them, go to the Q
 <img src="img/parameters.png" width="400">
 
 You can also work with parameters using `p` command in the console. Parameter names are case-insensitive.
+
+### Configure the IMU
+
+1. Configure the following parameters for the IMU:
+   * `IMU_MODEL` — IMU model (1 for MPU-9250/MPU-6500, 2 for ICM-20948, 3 for MPU-6050, 4 for ICM-40609-D).
+   * `IMU_BUS` — communication bus (0 for SPI, 1 for I²C).
+   * `IMU_PIN_SCK`, `IMU_PIN_MISO`, `IMU_PIN_MOSI`, `IMU_PIN_CS` — SPI pin numbers.
+   * `IMU_PIN_SCL`, `IMU_PIN_SDA` — I²C pin numbers.
+   * `IMU_PIN_INT` — IMU data ready pin number (-1 if not used).
+2. Reboot the drone.
+3. Check the IMU is working using `imu` command in the console (should print `status: OK`).
 
 ### Define IMU orientation
 
@@ -148,9 +182,9 @@ Before flight you need to calibrate the accelerometer:
 
 If using non-default motor pins, set the pin numbers using the parameters: `MOTOR_PIN_FL`, `MOTOR_PIN_FR`, `MOTOR_PIN_RL`, `MOTOR_PIN_RR` (front-left, front-right, rear-left, rear-right respectively).
 
-Certain ESP32 models (such as ESP32-S3 and ESP32-C3) support a lower maximum PWM frequency; on these boards the parameter `MOT_PWM_FREQ` should be set to 38000 Hz.
+#### Brushless motors
 
-If using brushless motors and ESCs:
+If using brushless motors with ESCs:
 
 1. Set the appropriate PWM using the parameters: `MOT_PWM_STOP`, `MOT_PWM_MIN`, and `MOT_PWM_MAX` (1000, 1000, and 2000 is typical).
 2. Decrease the PWM frequency using the `MOT_PWM_FREQ` parameter (400 is typical).
@@ -158,7 +192,7 @@ If using brushless motors and ESCs:
 > [!CAUTION]
 > **Remove the props when configuring the motors!** If improperly configured, you may not be able to stop them.
 
-### Battery voltage monitoring
+### Battery voltage monitoring (optional)
 
 ESP32 ADC can measure only up to 3.3 V, so you need to use a voltage divider to monitor the battery voltage. To enable voltage measurement, set the following parameters:
 
@@ -180,7 +214,7 @@ After this setup, you should see the battery voltage in QGroundControl top panel
 
 2. Check the attitude estimation: connect to the drone using QGroundControl, rotate the drone in different orientations and check if the attitude estimation shown in QGroundControl is correct. Compare your attitude indicator (in the *large vertical* mode) to the video:
 
-   <a href="https://youtu.be/yVRN23-GISU"><img width=300 src="https://i3.ytimg.com/vi/yVRN23-GISU/maxresdefault.jpg"></a>
+   <a href="https://youtu.be/yVRN23-GISU"><img width=300 src="https://quadcopter.dev/video/yVRN23-GISU.svg"></a>
 
 3. Perform motor tests. Use the following commands **— remove the propellers before running the tests!**
 
@@ -198,7 +232,7 @@ After this setup, you should see the battery voltage in QGroundControl top panel
 
 ## Setup remote control
 
-There are several ways to control the drone's flight: using **smartphone** (Wi-Fi), using **SBUS remote control**, or using **USB remote control** (Wi-Fi).
+There are several ways to control the drone's flight: using **smartphone** (Wi-Fi), using **SBUS remote control**, or using **USB remote control** (Wi-Fi/ESP-NOW).
 
 ### Control with a smartphone
 
@@ -222,7 +256,7 @@ There are several ways to control the drone's flight: using **smartphone** (Wi-F
 6. Use the virtual joystick to fly the drone!
 
 > [!TIP]
-> Decrease `CTL_TILT_MAX` parameter when flying using the smartphone to make the controls less sensitive.
+> Decrease `CTL_ATT_MAX` parameter when flying using the smartphone to make the controls less sensitive.
 
 ### Control with a remote control
 
@@ -243,7 +277,7 @@ If your drone doesn't have RC receiver installed, you can use USB remote control
 3. Power up the drone.
 4. Connect your computer to the appeared `flix` Wi-Fi network (password: `flixwifi`).
 5. Launch QGroundControl app. It should connect and begin showing the drone's telemetry automatically.
-6. Go the the QGroundControl menu ⇒ *Vehicle Setup* ⇒ *Joystick*. Calibrate you USB remote control there.
+6. Go to the QGroundControl menu ⇒ *Vehicle Setup* ⇒ *Joystick*. Calibrate your USB remote control there.
 7. Use the USB remote control to fly the drone!
 
 ## Flight
@@ -333,13 +367,13 @@ To setup ESP-NOW communication:
 
 1. Flash the second ESP32 board with ESP-NOW proxy sketch: [`tools/espnow-proxy/espnow-proxy.ino`](../tools/espnow-proxy/espnow-proxy.ino). Use Arduino IDE or command line: `make upload_proxy`.
 
-2. Open Serial Monitor or use `make monitor` command. The ESP32 will print its MAC address and generated encryption key, for example:
+2. Open Serial Monitor in Arduino IDE or use `make monitor` command. The ESP32 will print its MAC address and generated encryption key, for example:
 
    ```
    espnow 7a:c8:e3:eb:bf:e9 &PiuSysxP9+$L&5E
    ```
 
-   Run this line as a console command on each drone you want to bind to this proxy board. [The maximum number](https://github.com/espressif/esp-idf/blob/e95cab4be8fd293e3f3323181e7a2280874da6f7/components/esp_wifi/include/esp_now.h#L32-L33) of simultaneously connected drones is 20 (unencrypted) io 6 (encrypted).
+   Run this line as a console command on each drone you want to bind to this proxy board. [The maximum number](https://github.com/espressif/esp-idf/blob/e95cab4be8fd293e3f3323181e7a2280874da6f7/components/esp_wifi/include/esp_now.h#L32-L33) of simultaneously connected drones is 20 (unencrypted) or 6 (encrypted).
 
 3. Set the `WIFI_MODE` parameter to `3` on the drone:
 
@@ -352,11 +386,14 @@ To setup ESP-NOW communication:
    * Type: Serial.
    * Serial Port: choose the port of the proxy ESP32 board, e. g. `/dev/cu.usbserial-0001`.
    * Baud Rate: 115200.
-5. Click *Save*. QGroundControl should connect to the drone using ESP-NOW and begin showing the telemetry.
+5. Click *Save*, click *Connect*. QGroundControl should connect to the drone using ESP-NOW and begin showing the telemetry.
+
+> [!TIP]
+> Make sure Arduino IDE is not running when using ESP-NOW proxy board, as it may block the serial port.
 
 ## Flight log
 
-After the flight, you can download the flight log for analysis wirelessly. Use the following command on your computer for that:
+After the flight, you can download the flight log wirelessly for analysis. Use the following command on your computer for that:
 
 ```bash
 make log

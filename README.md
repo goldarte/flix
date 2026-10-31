@@ -39,7 +39,7 @@ Version 0 demo video: https://youtu.be/8GzzIQ3C6DQ.
 
 <a href="https://youtu.be/8GzzIQ3C6DQ"><img width=500 src="https://i3.ytimg.com/vi/8GzzIQ3C6DQ/maxresdefault.jpg"></a>
 
-Usage in education (RoboCamp): https://youtu.be/Wd3yaorjTx0.
+Usage in education (RoboCamp 2025): https://youtu.be/Wd3yaorjTx0.
 
 <a href="https://youtu.be/Wd3yaorjTx0"><img width=500 src="https://i3.ytimg.com/vi/Wd3yaorjTx0/sddefault.jpg"></a>
 
@@ -53,7 +53,13 @@ The official PCB *(Flix2)* is in development now. Follow the [project's channel]
 
 Outdoor flights demo video of the current prototype:
 
-<a href="https://youtu.be/KXlNmvUTi4g"><img width=300 src="https://i3.ytimg.com/vi/KXlNmvUTi4g/maxresdefault.jpg"></a>
+<a href="https://youtu.be/KXlNmvUTi4g"><img width=300 src="https://quadcopter.dev/video/KXlNmvUTi4g.svg"></a>
+
+### Position control
+
+The position control feature is in development. RoboCamp 2026 demo (using an overhead camera, [sources](https://github.com/xTimop/flix-poscontrol/compare/robolager2026...xTimop:flix-poscontrol:poscontrol)):
+
+<a href="https://youtu.be/369Xowm4HcU"><img width=300 src="https://quadcopter.dev/video/369Xowm4HcU.svg"></a>
 
 ## Simulation
 
@@ -84,9 +90,9 @@ Additional articles:
 |*Boost converter (optional, for more stable power supply)*|*5V output*|<img src="docs/img/buck-boost.jpg" width=100>|1|
 |Motor|8520 3.7V brushed motor.<br>Motor with exact 3.7V voltage is needed, not ranged working voltage (3.7V — 6V).<br>Make sure the motor shaft diameter and propeller hole diameter match!|<img src="docs/img/motor.jpeg" width=100>|4|
 |Propeller|55 mm or 65 mm|<img src="docs/img/prop.jpg" width=100>|4|
-|MOSFET (transistor)|100N03A or [analog](https://t.me/opensourcequadcopter/33)|<img src="docs/img/100n03a.jpg" width=100>|4|
+|MOSFET (transistor)|UMW 100N03A or [analog](https://t.me/opensourcequadcopter/33).<br>Warning: don't use KIA 100N03A or other manufacturers, they might not work!|<img src="docs/img/100n03a.jpg" width=100>|4|
 |Pull-down resistor<br>Voltage measurement resistor|10 kΩ|<img src="docs/img/resistor10k.jpg" width=100>|6|
-|3.7V Li-Po battery|LW 952540 (or any compatible by the size).<br>Make sure the battery has enough discharge rate — 25C or more!|<img src="docs/img/battery.jpg" width=100>|1|
+|3.7V Li-Po battery|LW 952540 (or any compatible by the size).<br>Make sure the battery has enough discharge rate and capacity — 25C with 1000 mAh or more is recommended!|<img src="docs/img/battery.jpg" width=100>|1|
 |Battery connector cable|MX2.0 2P female|<img src="docs/img/mx.png" width=100>|1|
 |Li-Po Battery charger|Any|<img src="docs/img/charger.jpg" width=100>|1|
 |Screws for IMU board mounting|M3x5|<img src="docs/img/screw-m3.jpg" width=100>|2|

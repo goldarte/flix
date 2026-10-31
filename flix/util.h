@@ -11,6 +11,8 @@
 const float ONE_G = 9.80665;
 extern float t;
 
+#define STRINGIFY(x) __STRINGIFY(x)
+
 float mapf(float x, float in_min, float in_max, float out_min, float out_max) {
 	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
@@ -69,27 +71,27 @@ struct Value {
 	enum { EMPTY, FLOAT, INT, BOOL, FLOAT_FN, INT_FN, BOOL_FN } type;
 	union {
 		void *pointer;
-		float *_float;
-		int *_int;
-		bool *_bool;
+		float *float_;
+		int *int_;
+		bool *bool_;
 		float (*floatFn)();
 		int (*intFn)();
 		bool (*boolFn)();
 	};
 
 	Value() : type(EMPTY), pointer(nullptr) {};
-	Value(float *pt) : type(FLOAT), _float(pt) {};
-	Value(int *pt) : type(INT), _int(pt) {};
-	Value(bool *pt) : type(BOOL), _bool(pt) {};
+	Value(float *pt) : type(FLOAT), float_(pt) {};
+	Value(int *pt) : type(INT), int_(pt) {};
+	Value(bool *pt) : type(BOOL), bool_(pt) {};
 	Value(float (*fn)()) : type(FLOAT_FN), floatFn(fn) {};
 	Value(int (*fn)()) : type(INT_FN), intFn(fn) {};
 	Value(bool (*fn)()) : type(BOOL_FN), boolFn(fn) {};
 
 	float get() const {
 		switch (type) {
-			case FLOAT: return *_float;
-			case INT: return *_int;
-			case BOOL: return *_bool ? 1 : 0;
+			case FLOAT: return *float_;
+			case INT: return *int_;
+			case BOOL: return *bool_ ? 1 : 0;
 			case FLOAT_FN: return floatFn();
 			case INT_FN: return intFn();
 			case BOOL_FN: return boolFn() ? 1 : 0;
@@ -97,21 +99,22 @@ struct Value {
 		}
 	};
 
-	void set(float value) const {
+	bool set(float value) const {
 		switch (type) {
-			case FLOAT: *_float = value; break;
-			case INT: *_int = value; break;
-			case BOOL: *_bool = (value != 0); break;
-			default: break;
+			case FLOAT: *float_ = value; break;
+			case INT: if (!isfinite(value)) return false; *int_ = value; break;
+			case BOOL: *bool_ = (value != 0); break;
+			default: return false;
 		}
-	};
+		return true;
+	}
 };
 
 // Rate limiter
 class Rate {
 public:
 	float rate;
-	float last = 0;
+	float last = -INFINITY;
 	Rate(float rate) : rate(rate) {}
 
 	operator bool() {

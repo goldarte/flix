@@ -21,6 +21,9 @@ extern float motors[4];
 Vector gyro, acc, imuRotation;
 Vector accBias, gyroBias, accScale(1, 1, 1);
 LowPassFilter<Vector> gyroBiasFilter(0);
+int imuModel = 1, imuBus = 0;
+int imuSckPin = 0, imuMisoPin = 0, imuMosiPin = 0, imuCsPin = -1, imuIntPin = -1;
+int imuSdaPin = 0, imuSclPin = 0;
 
 // declarations
 void step();
@@ -33,16 +36,16 @@ void interpretControls();
 void controlAttitude();
 void controlRates();
 void controlTorque();
-void desaturate(float& a, float& b, float& c, float& d);
+void desaturate();
 const char* getModeName();
 void sendMotors();
 int getDutyCycle(float value);
 bool motorsActive();
-void testMotor(int n);
+void testMotor(int, float);
 void print(const char* format, ...);
 void pause(float duration);
 void doCommand(String str, bool echo);
-void handleInput();
+void handleConsole();
 void setupRC();
 void normalizeRC();
 void calibrateRC();
@@ -64,6 +67,7 @@ void sendMavlink();
 void sendMessage(const void *msg);
 void receiveMavlink();
 void handleMavlink(const void *_msg);
+int handleMavlinkCommand(const void *_m);
 void mavlinkPrint(const char* str);
 void sendMavlinkPrint();
 inline Quaternion fluToFrd(const Quaternion &q);
@@ -72,6 +76,7 @@ void failsafe();
 void rcLossFailsafe();
 void descend();
 void autoFailsafe();
+void tiltFailsafe();
 int parametersCount();
 const char *getParameterName(int index);
 float getParameter(int index);
@@ -79,13 +84,20 @@ float getParameter(const char *name);
 bool setParameter(const char *name, const float value);
 void printParameters(const char *filter);
 void resetParameters();
+void handleAnimation();
+float packAnimation(uint8_t, uint8_t, uint8_t, uint8_t);
+void unpackAnimation(float, int&, int&, int&, int&);
 
 // mocks
 void setLED(bool on) {};
-void calibrateGyro() { print("Skip gyro calibrating\n"); };
 void calibrateAccel() { print("Skip accel calibrating\n"); };
 void printIMUCalibration() { print("cal: N/A\n"); };
 void printIMUInfo() {};
 void printWiFiInfo() {};
 void configWiFi(bool, const char*, const char*) { print("Skip WiFi config\n"); };
 void setWiFiMode(const String& mode) { print("Skip WiFi mode set\n"); };
+
+class IMU {
+public:
+	float getTemp() { return 0; }
+} *imu;

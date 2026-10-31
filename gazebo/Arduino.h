@@ -19,6 +19,16 @@
 #define RAD_TO_DEG 57.295779513082320876798154814105
 #define radians(deg) ((deg)*DEG_TO_RAD)
 #define degrees(rad) ((rad)*RAD_TO_DEG)
+#define LOW 0x0
+#define HIGH 0x1
+#define INPUT 0x01
+#define OUTPUT 0x03
+
+#define MALLOC_CAP_SPIRAM (1<<10)
+#define MALLOC_CAP_8BIT (1<<2)
+#define ESP_NOW_MAX_DATA_LEN_V2 1470
+#define digitalPinIsValid(pin) true
+#define digitalPinCanOutput(pin) true
 
 #define constrain(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
 template<typename T> T max(T a, T b) { return a > b ? a : b; }
@@ -59,6 +69,10 @@ public:
 	void toLowerCase() {
 		std::transform(this->begin(), this->end(), this->begin(),
 			[](unsigned char c) { return std::tolower(c); });
+	}
+	void toUpperCase() {
+		std::transform(this->begin(), this->end(), this->begin(),
+			[](unsigned char c) { return std::toupper(c); });
 	}
 };
 
@@ -134,8 +148,9 @@ public:
 
 	int available() {
 		// to implement for Windows, see https://stackoverflow.com/a/71992965/6850197
+		if (!isatty(STDIN_FILENO)) return 0;
 		struct pollfd pfd = { .fd = STDIN_FILENO, .events = POLLIN };
-		return poll(&pfd, 1, 0) > 0;
+		return poll(&pfd, 1, 0) > 0 && (pfd.revents & POLLIN);
 	}
 
 	int read() {
@@ -148,6 +163,17 @@ public:
 		return -1;
 	}
 
+	int read(uint8_t *buf, int len) {
+		if (available()) {
+			return ::read(STDIN_FILENO, buf, len);
+		}
+		return 0;
+	}
+
+	int write(const uint8_t *data, int len) {
+		return ::write(STDOUT_FILENO, data, len);
+	}
+
 	void setRxInvert(bool invert) {};
 };
 
@@ -157,6 +183,7 @@ class EspClass {
 public:
 	void restart() { Serial.println("Ignore reboot in simulation"); }
 	uint32_t getFreeHeap() { return 300 * 1024; } // assume 300 KB free heap
+	uint32_t getFreePsram() { return 8 * 1024 * 1024; } // assume 8 MB free PSRAM
 } ESP;
 
 unsigned long __delayTime = 0;
@@ -166,11 +193,19 @@ void delay(uint32_t ms) {
 	__delayTime += ms * 1000;
 }
 
+void *heap_caps_calloc(size_t n, size_t size, uint32_t caps) {
+	return calloc(n, size);
+}
+
+void pinMode(uint8_t pin, uint8_t mode) {};
+void digitalWrite(uint8_t pin, uint8_t val) {};
 bool ledcAttach(uint8_t pin, uint32_t freq, uint8_t resolution) { return true; }
+bool ledcDetach(uint8_t pin) { return true; }
 bool ledcWrite(uint8_t pin, uint32_t duty) { return true; }
 uint32_t ledcChangeFrequency(uint8_t pin, uint32_t freq, uint8_t resolution) { return freq; }
 int8_t digitalPinToAnalogChannel(uint8_t pin) { return -1; }
 uint32_t analogReadMilliVolts(uint8_t pin) { return 0; }
+float temperatureRead() { return 0; }
 
 unsigned long __micros;
 unsigned long __resetTime = 0;

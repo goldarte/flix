@@ -28,13 +28,13 @@ Firmware source files are located in `flix` directory.
 * [`control.ino`](../flix/control.ino) — control subsystem, three-dimensional two-level cascade PID controller.
 * [`motors.ino`](../flix/motors.ino) — PWM motor output control.
 * [`mavlink.ino`](../flix/mavlink.ino) — interaction with QGroundControl or [pyflix](../tools/pyflix) via MAVLink protocol.
-* [`cli.ino`](../flix/cli.ino) — serial and MAVLink console.
+* [`console.ino`](../flix/console.ino) — serial and MAVLink console.
 
 Utility files:
 
 * [`vector.h`](../flix/vector.h), [`quaternion.h`](../flix/quaternion.h) — vector and quaternion libraries.
 * [`pid.h`](../flix/pid.h) — generic PID controller.
-* [`lpf.h`](../flix/lpf.h) — generic low-pass filter.
+* [`filter.h`](../flix/filter.h) — generic low-pass filter.
 
 ### Control subsystem
 
@@ -60,7 +60,7 @@ To write into the console, `print()` function is used. This function sends data 
 print("Test value: %.2f\n", testValue);
 ```
 
-In order to add a console command, modify the `doCommand()` function in `cli.ino` file.
+In order to add a console command, modify the `doCommand()` function in `console.ino` file.
 
 > [!IMPORTANT]
 > Avoid using delays in in-flight commands, it will **crash** the drone! (The design is one-threaded.)
@@ -73,7 +73,7 @@ Parameters subsystem (`parameters.ino`) uses standard [Preferences.h](https://do
 
 To add a new parameter:
 
-1. Define a global variable for the parameter, two types are supported: `float` and `int`.
+1. Define a global variable for the parameter, three types are supported: `float`, `int`, and `bool`.
 2. Add an entry to the `parameters` array, with the parameter name, a pointer to the variable, and optionally a callback function to call when the parameter is changed.
 3. Everything else will be handled automatically.
 

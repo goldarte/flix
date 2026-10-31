@@ -2,6 +2,40 @@
 
 This page contains user-built drones based on the Flix project. Publish your projects into the official Telegram-chat: [@opensourcequadcopterchat](https://t.me/opensourcequadcopterchat) or send materials as a pull request.
 
+## RoboCamp 2026
+
+<p align=center>
+	<a href="https://quadcopter.dev/img/user/robocamp2026/1.jpg"><img height=200 src="https://quadcopter.dev/img/user/robocamp2026/1.preview.jpg"></a> <a href="https://quadcopter.dev/img/user/robocamp2026/2.jpg"><img height=200 src="https://quadcopter.dev/img/user/robocamp2026/2.preview.jpg"></a> <a href="https://quadcopter.dev/img/user/robocamp2026/3.jpg"><img height=200 src="https://quadcopter.dev/img/user/robocamp2026/3.preview.jpg"></a>
+</p>
+
+The second Flix RoboCamp event took place in July 2026 in Saint Petersburg. The main goal for the competitors was to build a Flix-based quadcopter and implement **autonomous position control** using distance sensors and an overhead camera. Several participants were able to implement altitude hold, and two participants implemented stable position hold.
+
+### Highlights
+
+The winning project performed an automatic takeoff, stable position hold (2 min+), and navigation to a point selected by the user by clicking on the camera image.
+
+See the demonstration video:
+
+<a href="https://youtu.be/369Xowm4HcU"><img width=300 src="https://quadcopter.dev/video/369Xowm4HcU.svg"></a>
+
+---
+
+Author: [Oleg1405](https://t.me/Oleg1405).<br>
+Description: ESP32 Mini, MPU-6500 IMU, boost converter, BT2.0 power connector, 65 mm props, BetaFPV ELRS Lite Receiver, Radiomaster Pocket + Mavlink Joystick (Android) control.
+
+<img src="img/user/oleg1405/1.jpg" height=300>
+
+[Flight video](https://www.youtube.com/shorts/rbXV4sHbpso).
+
+---
+
+Author: Alican Erüst.<br>
+Description: QX95 mm frame, 55 mm propellers, 3.7 V 25C 1050 mAh LiPo battery, MPU6050 IMU, Logitech F310 gamepad controller, with a total quadcopter weight of 66 g.
+
+<img src="img/user/alicanerus/1.jpg" height=200> <img src="img/user/alicanerus/2.jpg" height=200> <img src="img/user/alicanerus/3.jpg" height=200>
+
+[Flight video](https://drive.google.com/file/d/1k0WeWTKnCAfaugkX7LcmNxsUuq79RL8Z/view?usp=sharing).
+
 ---
 
 Author: [Неруш Михаил](https://t.me/NerushMV).<br>
@@ -23,7 +57,7 @@ Repository with all the code and PCB sources: https://github.com/Frapais/Sprig-D
 
 Detailed video about making the drone:
 
-<a href="https://youtu.be/82Q-uBq6s48"><img width=400 src="https://i3.ytimg.com/vi/82Q-uBq6s48/maxresdefault.jpg"></a>
+<a href="https://youtu.be/82Q-uBq6s48"><img width=400 src="https://quadcopter.dev/video/82Q-uBq6s48.svg"></a>
 
 ---
 
@@ -155,7 +189,7 @@ RoboCamp took place in July 2025, Saint Petersburg, where 9 participants designe
 
 See the detailed video about the event:
 
-<a href="https://youtu.be/Wd3yaorjTx0"><img width=500 src="https://img.youtube.com/vi/Wd3yaorjTx0/sddefault.jpg"></a>
+<a href="https://youtu.be/Wd3yaorjTx0"><img width=500 src="https://quadcopter.dev/video/Wd3yaorjTx0.sd.svg"></a>
 
 Built drones:
 

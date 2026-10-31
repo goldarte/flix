@@ -9,57 +9,62 @@
 extern int channelZero[16], channelMax[16];
 extern int rollChannel, pitchChannel, throttleChannel, yawChannel, armedChannel, modeChannel;
 extern int rcRxPin, voltagePin;
-extern int wifiMode, wifiLongRange, udpLocalPort, udpRemotePort, espnowChannel;
-extern float rcLossTimeout, descendTime;
+extern int wifiMode, wifiLongRange, wifiBroadcast, udpLocalPort, udpRemotePort, espnowChannel;
+extern float rcLossTimeout, descendTime, disarmTilt;
 extern float voltageScale;
 extern LowPassFilter<float> voltageFilter;
+extern float modeAnimation[4];
+
+#include "config.h"
 
 Preferences storage;
 
 struct Parameter {
 	const char *name; // max length is 15
-	bool integer;
-	union { float *f; int *i; }; // pointer to the variable
-	float inital; // default value
+	Value value; // pointer to the variable
+	float initial; // default value
 	float cache; // what's stored in flash
 	void (*callback)(); // called after parameter change
-	Parameter(const char *name, float *variable, void (*callback)() = nullptr) : name(name), integer(false), f(variable), callback(callback) {};
-	Parameter(const char *name, int *variable, void (*callback)() = nullptr) : name(name), integer(true), i(variable), callback(callback) {};
-	float getValue() const { return integer ? *i : *f; };
-	void setValue(const float value) { if (integer) *i = value; else *f = value; };
+	Parameter(const char *name, Value value, void (*callback)() = nullptr) : name(name), value(value), callback(callback) {};
 };
 
 Parameter parameters[] = {
 	// control
-	{"CTL_R_RATE_P", &rollRatePID.p},
-	{"CTL_R_RATE_I", &rollRatePID.i},
-	{"CTL_R_RATE_D", &rollRatePID.d},
-	{"CTL_R_RATE_WU", &rollRatePID.windup},
-	{"CTL_R_RATE_D_A", &rollRatePID.lpf.alpha},
-	{"CTL_P_RATE_P", &pitchRatePID.p},
-	{"CTL_P_RATE_I", &pitchRatePID.i},
-	{"CTL_P_RATE_D", &pitchRatePID.d},
-	{"CTL_P_RATE_WU", &pitchRatePID.windup},
-	{"CTL_P_RATE_D_A", &pitchRatePID.lpf.alpha},
-	{"CTL_Y_RATE_P", &yawRatePID.p},
-	{"CTL_Y_RATE_I", &yawRatePID.i},
-	{"CTL_Y_RATE_D", &yawRatePID.d},
-	{"CTL_Y_RATE_D_A", &yawRatePID.lpf.alpha},
-	{"CTL_R_P", &rollPID.p},
-	{"CTL_R_I", &rollPID.i},
-	{"CTL_R_D", &rollPID.d},
-	{"CTL_P_P", &pitchPID.p},
-	{"CTL_P_I", &pitchPID.i},
-	{"CTL_P_D", &pitchPID.d},
-	{"CTL_Y_P", &yawPID.p},
-	{"CTL_P_RATE_MAX", &maxRate.y},
-	{"CTL_R_RATE_MAX", &maxRate.x},
-	{"CTL_Y_RATE_MAX", &maxRate.z},
-	{"CTL_TILT_MAX", &tiltMax},
+	{"CTL_RATE_R_P", &rollRatePID.p},
+	{"CTL_RATE_R_I", &rollRatePID.i},
+	{"CTL_RATE_R_D", &rollRatePID.d},
+	{"CTL_RATE_R_WU", &rollRatePID.windup},
+	{"CTL_RATE_R_D_A", &rollRatePID.lpf.alpha},
+	{"CTL_RATE_P_P", &pitchRatePID.p},
+	{"CTL_RATE_P_I", &pitchRatePID.i},
+	{"CTL_RATE_P_D", &pitchRatePID.d},
+	{"CTL_RATE_P_WU", &pitchRatePID.windup},
+	{"CTL_RATE_P_D_A", &pitchRatePID.lpf.alpha},
+	{"CTL_RATE_Y_P", &yawRatePID.p},
+	{"CTL_RATE_Y_I", &yawRatePID.i},
+	{"CTL_RATE_Y_D", &yawRatePID.d},
+	{"CTL_RATE_Y_WU", &yawRatePID.windup},
+	{"CTL_RATE_Y_D_A", &yawRatePID.lpf.alpha},
+	{"CTL_RATE_P_MAX", &maxRate.y},
+	{"CTL_RATE_R_MAX", &maxRate.x},
+	{"CTL_RATE_Y_MAX", &maxRate.z},
+	{"CTL_ATT_R_P", &rollPID.p},
+	{"CTL_ATT_P_P", &pitchPID.p},
+	{"CTL_ATT_Y_P", &yawPID.p},
+	{"CTL_ATT_MAX", &tiltMax},
 	{"CTL_FLT_MODE_0", &flightModes[0]},
 	{"CTL_FLT_MODE_1", &flightModes[1]},
 	{"CTL_FLT_MODE_2", &flightModes[2]},
 	// imu
+	{"IMU_MODEL", &imuModel},
+	{"IMU_BUS", &imuBus},
+	{"IMU_PIN_SCK", &imuSckPin},
+	{"IMU_PIN_MISO", &imuMisoPin},
+	{"IMU_PIN_MOSI", &imuMosiPin},
+	{"IMU_PIN_CS", &imuCsPin},
+	{"IMU_PIN_SDA", &imuSdaPin},
+	{"IMU_PIN_SCL", &imuSclPin},
+	{"IMU_PIN_INT", &imuIntPin},
 	{"IMU_ROT_ROLL", &imuRotation.x},
 	{"IMU_ROT_PITCH", &imuRotation.y},
 	{"IMU_ROT_YAW", &imuRotation.z},
@@ -74,15 +79,15 @@ Parameter parameters[] = {
 	{"EST_ACC_WEIGHT", &accWeight},
 	{"EST_LVL_WEIGHT", &levelWeight},
 	{"EST_RATES_LPF_A", &ratesFilter.alpha},
-	{"EST_RATES_NF_F", &ratesNotch.frequency, setupEstimate},
-	{"EST_RATES_NF_BW", &ratesNotch.bandwidth, setupEstimate},
 	// led strip
 	{"LEDS_MODE", &ledstrip_mode},
+	{"EST_RATES_NO_F", &ratesNotch.frequency, setupEstimate},
+	{"EST_RATES_NO_BW", &ratesNotch.bandwidth, setupEstimate},
 	// motors
-	{"MOT_PIN_FL", &motorPins[MOTOR_FRONT_LEFT], setupMotors},
-	{"MOT_PIN_FR", &motorPins[MOTOR_FRONT_RIGHT], setupMotors},
-	{"MOT_PIN_RL", &motorPins[MOTOR_REAR_LEFT], setupMotors},
-	{"MOT_PIN_RR", &motorPins[MOTOR_REAR_RIGHT], setupMotors},
+	{"MOT_PIN_FL", &motorPins[MOT_FL], setupMotors},
+	{"MOT_PIN_FR", &motorPins[MOT_FR], setupMotors},
+	{"MOT_PIN_RL", &motorPins[MOT_RL], setupMotors},
+	{"MOT_PIN_RR", &motorPins[MOT_RR], setupMotors},
 	{"MOT_PWM_FREQ", &pwmFrequency, setupMotors},
 	{"MOT_PWM_RES", &pwmResolution, setupMotors},
 	{"MOT_PWM_STOP", &pwmStop},
@@ -116,12 +121,14 @@ Parameter parameters[] = {
 	{"WIFI_PORT_LOC", &udpLocalPort},
 	{"WIFI_PORT_REM", &udpRemotePort},
 	{"WIFI_LONG_RANGE", &wifiLongRange},
+	{"WIFI_BROADCAST", &wifiBroadcast},
 	// espnow
 	{"ESPNOW_CHANNEL", &espnowChannel},
 	// mavlink
 	{"MAV_SYS_ID", &mavlinkSysId},
 	{"MAV_RATE_SLOW", &telemetrySlow.rate},
 	{"MAV_RATE_ATT", &telemetryAttitude.rate},
+	{"MAV_RATE_ATT_TG", &telemetryAttitudeTarget.rate},
 	{"MAV_RATE_RC", &telemetryRC.rate},
 	{"MAV_RATE_MOT", &telemetryMotors.rate},
 	{"MAV_RATE_IMU", &telemetryIMU.rate},
@@ -148,18 +155,29 @@ Parameter parameters[] = {
 	// safety
 	{"SF_RC_LOSS_TIME", &rcLossTimeout},
 	{"SF_DESCEND_TIME", &descendTime},
+	{"SF_DISARM_TILT", &disarmTilt},
+	// led
+	{"LED_TYPE", &ledType, setupLED},
+	{"LED_PIN", &ledPin, setupLED},
+	{"LED_COUNT", &ledCount, setupLED},
+	{"LED_BRIGHTNESS", &ledBrightness, setupLED},
+	{"LED_ANIM_RAW", &modeAnimation[0], setupLED},
+	{"LED_ANIM_ACRO", &modeAnimation[1], setupLED},
+	{"LED_ANIM_STAB", &modeAnimation[2], setupLED},
+	{"LED_ANIM_AUTO", &modeAnimation[3], setupLED},
 };
 
 void setupParameters() {
 	print("Setup parameters\n");
+	setDefaults();
 	storage.begin("flix");
 	// Read parameters from storage
 	for (auto &parameter : parameters) {
-		parameter.inital = parameter.getValue();
+		parameter.initial = parameter.value.get();
 		if (storage.isKey(parameter.name)) {
-			parameter.setValue(storage.getFloat(parameter.name));
+			parameter.value.set(storage.getFloat(parameter.name));
 		}
-		parameter.cache = parameter.getValue();
+		parameter.cache = parameter.value.get();
 	}
 }
 
@@ -174,13 +192,13 @@ const char *getParameterName(int index) {
 
 float getParameter(int index) {
 	if (index < 0 || index >= parametersCount()) return NAN;
-	return parameters[index].getValue();
+	return parameters[index].value.get();
 }
 
 float getParameter(const char *name) {
 	for (auto &parameter : parameters) {
 		if (strcasecmp(parameter.name, name) == 0) {
-			return parameter.getValue();
+			return parameter.value.get();
 		}
 	}
 	return NAN;
@@ -189,10 +207,9 @@ float getParameter(const char *name) {
 bool setParameter(const char *name, const float value) {
 	for (auto &parameter : parameters) {
 		if (strcasecmp(parameter.name, name) == 0) {
-			if (parameter.integer && !isfinite(value)) return false; // can't set integer to NaN or Inf
-			parameter.setValue(value);
+			bool success = parameter.value.set(value);
 			if (parameter.callback) parameter.callback();
-			return true;
+			return success;
 		}
 	}
 	return false;
@@ -204,10 +221,10 @@ void syncParameters() {
 	if (motorsActive()) return; // don't use flash while flying, it may cause a delay
 
 	for (auto &parameter : parameters) {
-		if (floatEquals(parameter.getValue(), parameter.cache)) continue; // no change
+		if (floatEquals(parameter.value.get(), parameter.cache)) continue; // no change
 
-		storage.putFloat(parameter.name, parameter.getValue());
-		parameter.cache = parameter.getValue(); // update cache
+		storage.putFloat(parameter.name, parameter.value.get());
+		parameter.cache = parameter.value.get(); // update cache
 	}
 }
 
@@ -216,10 +233,10 @@ void printParameters(const char *filter) {
 	for (auto &parameter : parameters) {
 		if (strncasecmp(parameter.name, filter, strlen(filter))) continue;
 
-		if (floatEquals(parameter.getValue(), parameter.inital)) { // parameter changed
-			print("%-15s  %-13g\n", parameter.name, parameter.getValue());
+		if (floatEquals(parameter.value.get(), parameter.initial)) { // parameter changed
+			print("%-15s  %-13g\n", parameter.name, parameter.value.get());
 		} else {
-			print("%-15s  %-13g  [%g]\n", parameter.name, parameter.getValue(), parameter.inital);
+			print("%-15s  %-13g  [%g]\n", parameter.name, parameter.value.get(), parameter.initial);
 		}
 	}
 }

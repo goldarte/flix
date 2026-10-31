@@ -8,16 +8,18 @@
 #include "util.h"
 #include "filter.h"
 
-extern const int MOTOR_REAR_LEFT, MOTOR_REAR_RIGHT, MOTOR_FRONT_RIGHT, MOTOR_FRONT_LEFT;
+extern const int MOT_RL, MOT_RR, MOT_FR, MOT_FL;
 extern const int RAW, ACRO, STAB, AUTO;
 extern const int W_AP, W_STA, W_ESPNOW;
-extern float t, dt, loopRate;
+extern const int FILL, BLINK, RAINBOW;
+extern float t, dt, loopRate, controlTime, ledTime;
 extern uint16_t channels[16];
-extern float controlTime;
 extern int mode;
 extern bool armed;
 extern LowPassFilter<Vector> gyroBiasFilter;
 extern float voltage;
+extern bool mavlinkSerial;
+extern int ledAnimation, ledColor[3];
 
 const char* motd =
 " _______  __       __  ___   ___\n"
@@ -52,8 +54,9 @@ const char* motd =
 "sta <ssid> <password> - configure Wi-Fi client mode\n"
 "espnow <mac> [<key>] - configure ESP-NOW peer\n"
 "mot - show motor output\n"
+"mfr/mfl/mrr/mrl [<thrust>] - test motor (remove props)\n"
+"led off/fill/blink/rainbow/<number> [<r> <g> <b>] - set LED\n"
 "log [dump] - print log header [and data]\n"
-"mfr, mfl, mrr, mrl - test motor (remove props)\n"
 "log - show log info\n"
 "log header - show log header\n"
 "log reset - reset log\n"
@@ -63,6 +66,22 @@ const char* motd =
 "sys - show system info\n"
 "reset - reset drone's state\n"
 "reboot - reboot the drone\n";
+
+// Always redirect Serial to USB on ESP32-S3/ESP32-C3
+#if SOC_USB_SERIAL_JTAG_SUPPORTED && ARDUINO_USB_MODE
+#if !ARDUINO_USB_CDC_ON_BOOT
+HWCDC HWCDCSerial;
+#endif
+#undef Serial
+#define Serial HWCDCSerial
+#endif
+
+void setupConsole() {
+	Serial.begin(115200);
+#if SOC_USB_SERIAL_JTAG_SUPPORTED
+	Serial.setTxTimeoutMs(0); // never block on usb write
+#endif
+}
 
 void print(const char* format, ...) {
 	char buf[3000];
@@ -78,7 +97,7 @@ void pause(float duration) {
 	float start = t;
 	while (t - start < duration) {
 		step();
-		handleInput();
+		handleConsole();
 		processMavlink();
 		delay(50);
 	}
@@ -107,7 +126,7 @@ void doCommand(String str, bool echo = false) {
 		if (success) {
 			print("%s = %g\n", arg0.c_str(), getParameter(arg0.c_str()));
 		} else {
-			print("Parameter not found: %s\n", arg0.c_str());
+			print("Cannot set parameter: %s\n", arg0.c_str());
 		}
 	} else if (command == "preset") {
 		resetParameters();
@@ -169,7 +188,7 @@ void doCommand(String str, bool echo = false) {
 		configWiFi(W_ESPNOW, arg0.c_str(), arg1.c_str());
 	} else if (command == "mot") {
 		print("front-right %g front-left %g rear-right %g rear-left %g\n",
-			motors[MOTOR_FRONT_RIGHT], motors[MOTOR_FRONT_LEFT], motors[MOTOR_REAR_RIGHT], motors[MOTOR_REAR_LEFT]);
+			motors[MOT_FR], motors[MOT_FL], motors[MOT_RR], motors[MOT_RL]);
 	} else if (command == "log" && arg0 == "") {
 		printLogInfo();
 	} else if (command == "log" && arg1 != "") {
@@ -187,13 +206,27 @@ void doCommand(String str, bool echo = false) {
 	} else if (command == "ca") {
 		calibrateAccel();
 	} else if (command == "mfr") {
-		testMotor(MOTOR_FRONT_RIGHT);
+		testMotor(MOT_FR, arg0.isEmpty() ? 0.2 : arg0.toFloat());
 	} else if (command == "mfl") {
-		testMotor(MOTOR_FRONT_LEFT);
+		testMotor(MOT_FL, arg0.isEmpty() ? 0.2 : arg0.toFloat());
 	} else if (command == "mrr") {
-		testMotor(MOTOR_REAR_RIGHT);
+		testMotor(MOT_RR, arg0.isEmpty() ? 0.2 : arg0.toFloat());
 	} else if (command == "mrl") {
-		testMotor(MOTOR_REAR_LEFT);
+		testMotor(MOT_RL, arg0.isEmpty() ? 0.2 : arg0.toFloat());
+	} else if (command == "led") {
+		// parse animation
+		if (arg0 == "off" || arg0 == "fill") ledAnimation = FILL;
+		else if (arg0 == "blink") ledAnimation = BLINK;
+		else if (arg0 == "rainbow") ledAnimation = RAINBOW;
+		else ledAnimation = arg0.toInt();
+		// parse color
+		int r = 255, g = 255, b = 255; // assume white color by default
+		sscanf(arg1.c_str(), "%d %d %d", &r, &g, &b);
+		if (arg0 == "off") r = g = b = 0;
+		ledColor[0] = r;
+		ledColor[1] = g;
+		ledColor[2] = b;
+		ledTime = t;
 	} else if (command == "sys") {
 #ifdef ESP32
 		print("Chip: %s\n", ESP.getChipModel());
@@ -202,7 +235,11 @@ void doCommand(String str, bool echo = false) {
 		print("Free heap: %d KB\n", ESP.getFreeHeap() / 1024);
 		print("PSRAM: %d KB\n", ESP.getPsramSize() / 1024);
 		print("Free PSRAM: %d KB\n", ESP.getFreePsram() / 1024);
-		print("Firmware: " __DATE__ " " __TIME__ "\n");
+		print("Reset reason: %d\n", esp_reset_reason());
+#ifdef VERSION
+		print("Version: %s\n", STRINGIFY(VERSION));
+#endif
+		print("Build date: " __DATE__ " " __TIME__ "\n");
 		// Print tasks table
 		print("Num  Task                MinSt  Prio  Core  CPU%%\n");
 		int taskCount = uxTaskGetNumberOfTasks();
@@ -227,7 +264,7 @@ void doCommand(String str, bool echo = false) {
 	}
 }
 
-void handleInput() {
+void handleConsole() {
 	static bool showMotd = true;
 	static String input;
 

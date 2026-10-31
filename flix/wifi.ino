@@ -17,6 +17,7 @@ const int W_DISABLED = 0, W_AP = 1, W_STA = 2, W_ESPNOW = 3;
 int wifiMode = W_AP;
 
 int wifiLongRange = 0;
+int wifiBroadcast = 0; // 0 - broadcast until connected, 1 - always broadcast
 int udpLocalPort = 14550;
 int udpRemotePort = 14550;
 IPAddress udpRemoteIP = "255.255.255.255";
@@ -58,13 +59,14 @@ void sendWiFi(const uint8_t *buf, int len) {
 		espnow.write(buf, len);
 
 		static Rate discovery(2);
-		if (discovery) espnowBroadcast.write((const uint8_t *)"flix", 4); // broadcast message to help finding this device
+		if (espnow.isEncrypted() && discovery) espnowBroadcast.write((const uint8_t *)"flix", 4); // broadcast message to help finding this device
 		return;
 	}
 
 	if (WiFi.softAPgetStationNum() == 0 && !WiFi.isConnected()) return;
 
-	udp.beginPacket(udpRemoteIP, udpRemotePort);
+	bool broadcast = wifiBroadcast || !(t - mavlinkTime < 5); // broadcast if lost connection
+	udp.beginPacket(broadcast ? IPAddress(255, 255, 255, 255) : udpRemoteIP, udpRemotePort);
 	udp.write(buf, len);
 	udp.endPacket();
 }
@@ -113,7 +115,7 @@ void printWiFiInfo() {
 	} else {
 		print("Mode: Disabled\n");
 	}
-	print("MAVLink connected: %d\n", mavlinkConnected);
+	print("MAVLink connected: %d\n", valid(mavlinkTime));
 }
 
 void configWiFi(int mode, const char *first, const char *second) {

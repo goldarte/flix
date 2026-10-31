@@ -9,7 +9,7 @@
 #include "util.h"
 
 float voltage = NAN;
-LowPassFilter<float> voltageFilter(0.2);
+LowPassFilter<float> voltageFilter(1);
 int voltagePin = 5;
 float voltageScale = 2;
 

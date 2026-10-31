@@ -3,22 +3,24 @@
 
 // MAVLink communication
 
-#include <MAVLink.h>
+#include <MAVLink.h> // if seeing 'No such file or directory', search and install MAVLink in Tools -> Manage Libraries
 #include "util.h"
 
 extern float controlTime;
 extern float voltage;
+extern int voltagePin, rcRxPin;
 
 int mavlinkSysId = 1;
 
 Rate telemetrySlow(2);
 Rate telemetryAttitude(20);
+Rate telemetryAttitudeTarget(0);
 Rate telemetryRC(10);
 Rate telemetryMotors(10);
 Rate telemetryIMU(15);
 Rate telemetryTopic(10);
 
-bool mavlinkConnected = false;
+float mavlinkTime = NAN; // time of last received message
 String mavlinkPrintBuffer;
 
 void processMavlink() {
@@ -33,7 +35,7 @@ void sendMavlink() {
 	uint32_t time = t * 1000;
 
 	if (telemetrySlow) {
-		mavlink_msg_heartbeat_pack(mavlinkSysId, MAV_COMP_ID_AUTOPILOT1, &msg, MAV_TYPE_QUADROTOR, MAV_AUTOPILOT_GENERIC,
+		mavlink_msg_heartbeat_pack(mavlinkSysId, MAV_COMP_ID_AUTOPILOT1, &msg, MAV_TYPE_QUADROTOR, MAV_AUTOPILOT_FLIX,
 			(armed ? MAV_MODE_FLAG_SAFETY_ARMED : 0) |
 			((mode == STAB) ? MAV_MODE_FLAG_STABILIZE_ENABLED : 0) |
 			((mode == AUTO) ? MAV_MODE_FLAG_AUTO_ENABLED : MAV_MODE_FLAG_MANUAL_INPUT_ENABLED),
@@ -41,7 +43,7 @@ void sendMavlink() {
 		sendMessage(&msg);
 	}
 
-	if (!mavlinkConnected) return; // send only heartbeat until connected
+	if (!valid(mavlinkTime)) return; // send only heartbeat until connected
 
 	if (telemetrySlow) {
 		mavlink_msg_extended_sys_state_pack(mavlinkSysId, MAV_COMP_ID_AUTOPILOT1, &msg,
@@ -62,6 +64,15 @@ void sendMavlink() {
 		const float offset[] = {0, 0, 0, 0};
 		mavlink_msg_attitude_quaternion_pack(mavlinkSysId, MAV_COMP_ID_AUTOPILOT1, &msg,
 			time, attitude.w, attitude.x, -attitude.y, -attitude.z, rates.x, -rates.y, -rates.z, offset); // convert to frd
+		sendMessage(&msg);
+	}
+
+	if (telemetryAttitudeTarget) {
+		const float att[] = {attitudeTarget.w, attitudeTarget.x, -attitudeTarget.y, -attitudeTarget.z};
+		Vector rt = attitudeTarget.invalid() ? ratesTarget : ratesExtra;
+		mavlink_msg_attitude_target_pack(mavlinkSysId, MAV_COMP_ID_AUTOPILOT1, &msg, time,
+			attitudeTarget.invalid() ? ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE : 0,
+			att, rt.x, -rt.y, -rt.z, thrustTarget);
 		sendMessage(&msg);
 	}
 
@@ -128,7 +139,7 @@ void receiveMavlink() {
 	mavlink_status_t status;
 	for (int i = 0; i < len; i++) {
 		if (mavlink_parse_char(MAVLINK_COMM_0, buf[i], &msg, &status)) {
-			mavlinkConnected = true;
+			mavlinkTime = t;
 			handleMavlink(&msg);
 		}
 	}
@@ -223,18 +234,24 @@ void handleMavlink(const void *_msg) {
 		mavlink_msg_set_attitude_target_decode(&msg, &m);
 		if (m.target_system && m.target_system != mavlinkSysId) return;
 
-		// copy attitude, rates and thrust targets
-		ratesTarget.x = m.body_roll_rate;
-		ratesTarget.y = -m.body_pitch_rate; // convert to flu
-		ratesTarget.z = -m.body_yaw_rate;
-		attitudeTarget.w = m.q[0];
-		attitudeTarget.x = m.q[1];
-		attitudeTarget.y = -m.q[2];
-		attitudeTarget.z = -m.q[3];
-		thrustTarget = m.thrust;
-		ratesExtra = Vector(0, 0, 0);
+		if (!(m.type_mask & ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE)) {
+			// Attitude control
+			attitudeTarget.w = m.q[0];
+			attitudeTarget.x = m.q[1];
+			attitudeTarget.y = -m.q[2]; // convert to flu
+			attitudeTarget.z = -m.q[3];
+			ratesExtra.x = m.body_roll_rate;
+			ratesExtra.y = -m.body_pitch_rate;
+			ratesExtra.z = -m.body_yaw_rate;
+		} else {
+			// Rates control
+			attitudeTarget.invalidate();
+			ratesTarget.x = m.body_roll_rate;
+			ratesTarget.y = -m.body_pitch_rate;
+			ratesTarget.z = -m.body_yaw_rate;
+		}
 
-		if (m.type_mask & ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE) attitudeTarget.invalidate();
+		thrustTarget = valid(m.thrust) ? m.thrust : thrustTarget;
 		armed = m.thrust > 0;
 	}
 
@@ -277,38 +294,81 @@ void handleMavlink(const void *_msg) {
 		flushBatchMessages();
 	}
 
-	// Handle commands
+	if (msg.msgid == MAVLINK_MSG_ID_TUNNEL) {
+		mavlink_tunnel_t m;
+		mavlink_msg_tunnel_decode(&msg, &m);
+		if (m.target_system && m.target_system != mavlinkSysId) return;
+
+		if (m.payload_type == 789) { // 789 is led control
+			for (int i = 0; i < m.payload_length; i += 4) {
+				led[m.payload[i]] = RGB(m.payload[i + 1], m.payload[i + 2], m.payload[i + 3]);
+			}
+		}
+	}
+
 	if (msg.msgid == MAVLINK_MSG_ID_COMMAND_LONG) {
 		mavlink_command_long_t m;
 		mavlink_msg_command_long_decode(&msg, &m);
 		if (m.target_system && m.target_system != mavlinkSysId) return;
-		mavlink_message_t response;
-		bool accepted = false;
 
-		if (m.command == MAV_CMD_REQUEST_MESSAGE && m.param1 == MAVLINK_MSG_ID_AUTOPILOT_VERSION) {
-			accepted = true;
-			mavlink_msg_autopilot_version_pack(mavlinkSysId, MAV_COMP_ID_AUTOPILOT1, &response,
-				MAV_PROTOCOL_CAPABILITY_PARAM_FLOAT | MAV_PROTOCOL_CAPABILITY_MAVLINK2, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0);
-			sendMessage(&response);
-		}
-
-		if (m.command == MAV_CMD_COMPONENT_ARM_DISARM) {
-			if (m.param1 == 1 && controlThrottle > 0.05) return; // don't arm if throttle is not low
-			accepted = true;
-			armed = m.param1 == 1;
-		}
-
-		if (m.command == MAV_CMD_DO_SET_MODE) {
-			if (m.param2 < 0 || m.param2 > AUTO) return; // incorrect mode
-			accepted = true;
-			mode = m.param2;
-		}
-
-		// send command ack
+		int result = handleMavlinkCommand(&m);
 		mavlink_message_t ack;
-		mavlink_msg_command_ack_pack(mavlinkSysId, MAV_COMP_ID_AUTOPILOT1, &ack, m.command, accepted ? MAV_RESULT_ACCEPTED : MAV_RESULT_UNSUPPORTED, UINT8_MAX, 0, msg.sysid, msg.compid);
+		mavlink_msg_command_ack_pack(mavlinkSysId, MAV_COMP_ID_AUTOPILOT1, &ack, m.command, result, UINT8_MAX, 0, msg.sysid, msg.compid);
 		sendMessage(&ack);
 	}
+}
+
+int handleMavlinkCommand(const void *_m) {
+	const mavlink_command_long_t& m = *(mavlink_command_long_t *)_m;
+
+	if (m.command == MAV_CMD_REQUEST_MESSAGE && m.param1 == MAVLINK_MSG_ID_AUTOPILOT_VERSION) {
+		mavlink_message_t response;
+		mavlink_msg_autopilot_version_pack(mavlinkSysId, MAV_COMP_ID_AUTOPILOT1, &response,
+			MAV_PROTOCOL_CAPABILITY_PARAM_FLOAT | MAV_PROTOCOL_CAPABILITY_MAVLINK2, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0);
+		sendMessage(&response);
+		return MAV_RESULT_ACCEPTED;
+	}
+
+	if (m.command == MAV_CMD_REQUEST_MESSAGE && m.param1 == MAVLINK_MSG_ID_COMPONENT_METADATA) {
+		mavlink_message_t response;
+		mavlink_msg_component_metadata_pack(mavlinkSysId, MAV_COMP_ID_AUTOPILOT1, &response, t * 1000,
+		1453394476, // crc
+		"https://quadcopter.dev/meta/1453394476/general.json");
+		sendMessage(&response);
+		return MAV_RESULT_ACCEPTED;
+	}
+
+	if (m.command == MAV_CMD_COMPONENT_ARM_DISARM) {
+		if (m.param1 == 1 && controlThrottle > 0.05) return MAV_RESULT_DENIED; // don't arm if throttle is not low
+		armed = m.param1 == 1;
+		return MAV_RESULT_ACCEPTED;
+	}
+
+	if (m.command == MAV_CMD_DO_SET_MODE) {
+		if (m.param2 < 0 || m.param2 > AUTO) return MAV_RESULT_DENIED; // incorrect mode
+		mode = m.param2;
+		return MAV_RESULT_ACCEPTED;
+	}
+
+	if (m.command == MAV_CMD_DO_SET_SERVO) {
+		int pin = m.param1;
+		int pwm = m.param2;
+		int frequency = m.param3 > 0 ? m.param3 : 50; // non-standard
+		int resolution = m.param4 > 0 ? m.param4 : 10; // non-standard
+
+		// Basic safety checks to avoid short circuits
+		if (!digitalPinCanOutput(pin)) return MAV_RESULT_DENIED;
+		if (pin == imuIntPin || pin == voltagePin || pin == rcRxPin) return MAV_RESULT_DENIED;
+		if (imuBus == 0 && (pin == imuSckPin || pin == imuMisoPin || pin == imuMosiPin || pin == imuCsPin)) return MAV_RESULT_DENIED;
+		if (imuBus == 1 && (pin == imuSdaPin || pin == imuSclPin)) return MAV_RESULT_DENIED;
+
+		ledcDetach(pin);
+		ledcAttach(pin, frequency, resolution);
+		ledcChangeFrequency(pin, frequency, resolution);
+		return ledcWrite(pin, pwm * frequency * (1 << resolution) / 1000000) ? MAV_RESULT_ACCEPTED : MAV_RESULT_FAILED;
+	}
+
+	return MAV_RESULT_UNSUPPORTED;
 }
 
 // Send shell output to GCS

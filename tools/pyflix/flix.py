@@ -44,7 +44,7 @@ class Flix:
     _print_buffer: str = ''
     _modes = ['RAW', 'ACRO', 'STAB', 'AUTO']
 
-    def __init__(self, system_id: int=1, wait_connection: bool=True, device=os.getenv('FLIX_DEVICE')):
+    def __init__(self, system_id: int=1, wait_connection: bool=True, timeout: Optional[float]=None, device=os.getenv('FLIX_DEVICE')):
         if not (0 <= system_id < 256):
             raise ValueError('system_id must be in range [0, 255]')
         self._setup_mavlink()
@@ -74,7 +74,7 @@ class Flix:
         self._heartbeat_thread = Thread(target=self._send_heartbeat, daemon=True)
         self._heartbeat_thread.start()
         if wait_connection:
-            self.wait('mavlink.HEARTBEAT')
+            self.wait('mavlink.HEARTBEAT', timeout=timeout)
             time.sleep(0.6) # give some time to receive initial state
 
     def _init_state(self):
@@ -243,7 +243,7 @@ class Flix:
             time.sleep(1)
 
     @staticmethod
-    def _mavlink_to_flu(v: List[float]) -> List[float]:
+    def _mavlink_to_flu(v: Sequence[float]) -> List[float]:
         if len(v) == 3:  # vector
             return [v[0], -v[1], -v[2]]
         elif len(v) == 4:  # quaternion
@@ -252,21 +252,8 @@ class Flix:
             raise ValueError(f'List must have 3 (vector) or 4 (quaternion) elements')
 
     @staticmethod
-    def _flu_to_mavlink(v: List[float]) -> List[float]:
-        return Flix._mavlink_to_flu(v)
-
-    def _command_send(self, command: int, params: Sequence[float]):
-        if len(params) != 7:
-            raise ValueError('Command must have 7 parameters')
-        for attempt in range(3):
-            try:
-                logger.debug(f'Send command {command} with params {params} (attempt #{attempt + 1})')
-                self.mavlink.command_long_send(self.system_id, 0, command, 0, *params)  # type: ignore
-                self.wait('mavlink.COMMAND_ACK', value=lambda msg: msg.command == command and msg.result == mavlink.MAV_RESULT_ACCEPTED, timeout=0.1)
-                return
-            except TimeoutError:
-                continue
-        raise RuntimeError(f'Failed to send command {command} after 3 attempts')
+    def _flu_to_mavlink(v: Sequence[float]) -> List[float]:
+        return Flix._mavlink_to_flu(v)  # flu to mavlink is the same as mavlink to flu
 
     def _connected(self):
         # Reset disconnection timer
@@ -283,6 +270,23 @@ class Flix:
         logger.info('Connection is lost')
         self.connected = False
         self._trigger('disconnected')
+
+    def send_command(self, command: int, params: Sequence[float]):
+        if len(params) != 7:
+            raise ValueError('Command must have 7 parameters')
+        for attempt in range(3):
+            try:
+                logger.debug(f'Send command {command} with params {params} (attempt #{attempt + 1})')
+                self.mavlink.command_long_send(self.system_id, 0, command, 0, *params)  # type: ignore
+                ack: mavlink.MAVLink_command_ack_message = self.wait('mavlink.COMMAND_ACK', value=lambda msg: msg.command == command, timeout=0.1)
+                if ack.result != mavlink.MAV_RESULT_ACCEPTED:
+                    name = getattr(mavlink.enums['MAV_CMD'].get(command, {}), 'name', f'UNKNOWN({command})')
+                    result = getattr(mavlink.enums['MAV_RESULT'].get(ack.result, {}), 'name', f'UNKNOWN({ack.result})')
+                    raise RuntimeError(f'Command {name} failed with result {result}')
+                return
+            except TimeoutError:
+                continue
+        raise RuntimeError(f'Failed to send command {command} after 3 attempts')
 
     def get_param(self, name: str) -> float:
         if len(name.encode('ascii')) > 16:
@@ -315,18 +319,18 @@ class Flix:
     def set_mode(self, mode: Union[str, int]):
         if isinstance(mode, str):
             mode = self._modes.index(mode.upper())
-        self._command_send(mavlink.MAV_CMD_DO_SET_MODE, (0, mode, 0, 0, 0, 0, 0))
+        self.send_command(mavlink.MAV_CMD_DO_SET_MODE, (0, mode, 0, 0, 0, 0, 0))
 
     def set_armed(self, armed: bool):
-        self._command_send(mavlink.MAV_CMD_COMPONENT_ARM_DISARM, (1 if armed else 0, 0, 0, 0, 0, 0, 0))
+        self.send_command(mavlink.MAV_CMD_COMPONENT_ARM_DISARM, (1 if armed else 0, 0, 0, 0, 0, 0, 0))
 
-    def set_position(self, position: List[float], yaw: Optional[float] = None, wait: bool = False, tolerance: float = 0.1):
+    def set_position(self, position: Sequence[float], yaw: Optional[float] = None, wait: bool = False, tolerance: float = 0.1):
         raise NotImplementedError('Position control is not implemented yet')
 
-    def set_velocity(self, velocity: List[float], yaw: Optional[float] = None):
+    def set_velocity(self, velocity: Sequence[float], yaw: Optional[float] = None):
         raise NotImplementedError('Velocity control is not implemented yet')
 
-    def set_attitude(self, attitude: List[float], thrust: float):
+    def set_attitude(self, attitude: Sequence[float], thrust: float, rates_extra: Sequence[float] = (0, 0, 0)):
         if len(attitude) == 3:
             attitude = Quaternion([attitude[0], attitude[1], attitude[2]]).q  # type: ignore
         elif len(attitude) != 4:
@@ -334,12 +338,13 @@ class Flix:
         if not (0 <= thrust <= 1):
             raise ValueError('Thrust must be in range [0, 1]')
         attitude = self._flu_to_mavlink(attitude)
+        rates_extra = self._flu_to_mavlink(rates_extra)
         for _ in range(2): # duplicate to ensure delivery
             self.mavlink.set_attitude_target_send(0, self.system_id, 0, 0,
                 [attitude[0], attitude[1], attitude[2], attitude[3]],
-                0, 0, 0, thrust)
+                rates_extra[0], rates_extra[1], rates_extra[2], thrust)
 
-    def set_rates(self, rates: List[float], thrust: float):
+    def set_rates(self, rates: Sequence[float], thrust: float):
         if len(rates) != 3:
             raise ValueError('Rates must be [roll_rate, pitch_rate, yaw_rate]')
         if not (0 <= thrust <= 1):
@@ -351,7 +356,7 @@ class Flix:
                 [1, 0, 0, 0],
                 rates[0], rates[1], rates[2], thrust)
 
-    def set_motors(self, motors: List[float]):
+    def set_motors(self, motors: Sequence[float]):
         if len(motors) != 4:
             raise ValueError('motors must have 4 values')
         if not all(0 <= m <= 1 for m in motors):
@@ -366,6 +371,34 @@ class Flix:
         if not 0 <= throttle <= 1:
             raise ValueError('throttle must be in range [0, 1]')
         self.mavlink.manual_control_send(self.system_id, int(pitch * 1000), int(roll * 1000), int(throttle * 1000), int(yaw * 1000), 0)  # type: ignore
+
+    def set_pin(self, pin: int, duty: Optional[float] = None, frequency: float = 50, pwm: Optional[int] = None):
+        if frequency <= 0:
+            raise ValueError('Frequency must be positive')
+        if pwm is None:
+            if duty is None or duty < 0 or duty > 1:
+                raise ValueError('Duty cycle must be in range [0, 1]')
+            pwm = int(duty * 1000000 / frequency)
+        if pwm < 0 or pwm > 1000000 / frequency:
+            raise ValueError(f'PWM must be in range [0, {1000000 / frequency}]')
+        self.send_command(mavlink.MAV_CMD_DO_SET_SERVO, (pin, pwm, frequency, 0, 0, 0, 0))
+
+    def set_led(self, led: Sequence[Union[int, Sequence[int]]]):
+        if isinstance(led, bool):  # set_led(True) - single led on/off
+            led = [0, 255, 255, 255]
+        elif len(led) == 3 and type(led[0]) == int:  # set_led(r, g, b) - single led color
+            led = [0, led[0], led[1], led[2]]
+        elif len(led[0]) == 4:  # set_led([[index, r, g, b], ...) - multiple led colors
+            led = [value for led in led for value in led]
+
+        TUNNEL_PAYLOAD_LEN = mavlink.MAVLink_tunnel_message.lengths[mavlink.MAVLink_tunnel_message.fieldnames.index('payload')]
+        PAYLOAD_TYPE_LED = 789  # custom payload type
+
+        # send by chunks
+        for i in range(0, len(led), TUNNEL_PAYLOAD_LEN):
+            chunk = bytes(led[i:i + TUNNEL_PAYLOAD_LEN])  # type: ignore
+            payload = chunk.ljust(TUNNEL_PAYLOAD_LEN, b'\0')
+            self.mavlink.tunnel_send(self.system_id, 0, PAYLOAD_TYPE_LED, len(chunk), payload)  # type: ignore
 
     def cli(self, cmd: str, wait_response: bool = True) -> str:
         cmd = cmd.strip()

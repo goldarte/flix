@@ -5,9 +5,11 @@ on:
     branches: [ '*' ]
   pull_request:
     branches: [ master ]
+  workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -15,7 +17,7 @@ jobs:
   markdownlint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Install markdownlint
       run: npm install -g markdownlint-cli2
     - name: Run markdownlint
@@ -24,19 +26,93 @@ jobs:
   build_book:
     runs-on: ubuntu-latest
     needs: markdownlint
+    env:
+      DEPLOY: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref_name == 'master' || github.ref_name == 'dev') }}
+      QUADCOPTER_DEV_TOKEN: ${{ secrets.QUADCOPTER_DEV_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Install mdBook
       run: cargo install mdbook --vers 0.4.43 --locked
+    - name: Download additional files
+      if: ${{ env.DEPLOY && env.QUADCOPTER_DEV_TOKEN }}
+      uses: actions/checkout@v7
+      with:
+        repository: okalachev/quadcopter.dev
+        ref: content
+        token: ${{ secrets.QUADCOPTER_DEV_TOKEN }}
+        path: quadcopter.dev
+        fetch-depth: 1
+    - name: Add additional files
+      if: ${{ env.DEPLOY && env.QUADCOPTER_DEV_TOKEN }}
+      run: rsync -a --keep-dirlinks quadcopter.dev/. docs/book/
     - name: Build book
       run: cd docs && mdbook build
+    - name: Wait for Build to complete
+      if: ${{ env.DEPLOY }}
+      uses: matiasalbarello/wait-on-check-action-ts@v1.2.0
+      with:
+        ref: ${{ github.sha }}
+        check-name: build_linux
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        wait-interval: 30
+    - name: Find firmware binaries
+      if: ${{ env.DEPLOY }}
+      id: build_run
+      run: |
+        RUN_ID=$(gh api "repos/${{ github.repository }}/actions/workflows/build.yml/runs?head_sha=${{ github.sha }}" --jq '.workflow_runs[0].id')
+        echo "id=$RUN_ID" >> $GITHUB_OUTPUT
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Download firmware binaries
+      if: ${{ env.DEPLOY }}
+      uses: actions/download-artifact@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ github.repository }}
+        run-id: ${{ steps.build_run.outputs.id }}
+        name: firmware-binary
+        path: docs/build/dist
+    - name: Create shortcuts for firmware binaries
+      working-directory: docs/build
+      run: |
+        for TARGET in dist/*; do
+          TARGET=$(basename $TARGET)
+          mv "dist/$TARGET" "flix.$TARGET"
+          zip -r flix.$TARGET.zip flix.$TARGET
+          ln -s "flix.$TARGET/flix.ino.merged.bin" "flix.$TARGET.merged.bin"
+          ln -s "flix.$TARGET/flix.ino.bin" "flix.$TARGET.bin"
+          ln -s "flix.$TARGET/flix.ino.bootloader.bin" "flix.$TARGET.bootloader.bin"
+        done
+    - name: Put version file
+      run: echo "${{ github.sha }}" > docs/build/version.txt
+    - name: Test build artifacts
+      if: ${{ env.DEPLOY }}
+      working-directory: docs/build
+      run: |
+        tree -a -I .git
+        ls index.html gyro.html geometry.html firmware.html \
+        flix.esp32.merged.bin flix.esp32c3.merged.bin flix.esp32s3.merged.bin flix.esp32s3.opi.merged.bin flix.esp32s3.qspi.merged.bin flix.flix2.merged.bin \
+        flix.esp32.zip flix.esp32c3.zip flix.esp32s3.zip flix.esp32s3.opi.zip flix.esp32s3.qspi.zip flix.flix2.zip \
+        flix.esp32/ flix.esp32c3/ flix.esp32s3/ flix.esp32s3.opi/ flix.esp32s3.qspi/ flix.flix2/ \
+        meta/general.json meta/parameters.json version.txt
+        grep ${GITHUB_SHA:0:7} flix.esp32.bin
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
+      uses: actions/upload-pages-artifact@v5
       with:
         path: docs/build
+        retention-days: 3
+    - name: Upload Preview
+      uses: cloudflare/wrangler-action@v4
+      if: ${{ env.DEPLOY && github.ref_name == 'dev' && env.CLOUDFLARE_API_TOKEN }}
+      with:
+        apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+        command: pages deploy docs/build --project-name=dev-quadcopter --branch=dev
 
   deploy:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+    if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == 'master' }}
     concurrency:
       group: "pages"
       cancel-in-progress: true
@@ -48,4 +124,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

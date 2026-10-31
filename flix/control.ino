@@ -9,31 +9,6 @@
 #include "filter.h"
 #include "util.h"
 
-#define PITCHRATE_P 0.05
-#define PITCHRATE_I 0.2
-#define PITCHRATE_D 0.001
-#define PITCHRATE_I_LIM 0.3
-#define ROLLRATE_P PITCHRATE_P
-#define ROLLRATE_I PITCHRATE_I
-#define ROLLRATE_D PITCHRATE_D
-#define ROLLRATE_I_LIM PITCHRATE_I_LIM
-#define YAWRATE_P 0.3
-#define YAWRATE_I 0.0
-#define YAWRATE_D 0.0
-#define YAWRATE_I_LIM 0.3
-#define ROLL_P 6
-#define ROLL_I 0
-#define ROLL_D 0
-#define PITCH_P ROLL_P
-#define PITCH_I ROLL_I
-#define PITCH_D ROLL_D
-#define YAW_P 3
-#define PITCHRATE_MAX radians(360)
-#define ROLLRATE_MAX radians(360)
-#define YAWRATE_MAX radians(300)
-#define TILT_MAX radians(30)
-#define RATES_D_LPF_ALPHA 0.2 // cutoff frequency ~ 40 Hz
-
 const int RAW = 0, ACRO = 1, STAB = 2, AUTO = 3; // flight modes
 int mode = STAB;
 bool armed = false;
@@ -41,20 +16,20 @@ bool armed = false;
 Quaternion attitudeTarget;
 Vector ratesTarget;
 Vector ratesExtra; // feedforward rates
-Vector torqueTarget;
+Vector torqueTarget; // 0 - no torque, 1 - maximum torque
 float thrustTarget;
 
-PID rollRatePID(ROLLRATE_P, ROLLRATE_I, ROLLRATE_D, ROLLRATE_I_LIM, RATES_D_LPF_ALPHA);
-PID pitchRatePID(PITCHRATE_P, PITCHRATE_I, PITCHRATE_D, PITCHRATE_I_LIM, RATES_D_LPF_ALPHA);
-PID yawRatePID(YAWRATE_P, YAWRATE_I, YAWRATE_D);
-PID rollPID(ROLL_P, ROLL_I, ROLL_D);
-PID pitchPID(PITCH_P, PITCH_I, PITCH_D);
-PID yawPID(YAW_P, 0, 0);
-Vector maxRate(ROLLRATE_MAX, PITCHRATE_MAX, YAWRATE_MAX);
-float tiltMax = TILT_MAX;
+PID rollRatePID(0.05, 0.2, 0.001, 0.3, 0.2);
+PID pitchRatePID(0.05, 0.2, 0.001, 0.3, 0.2);
+PID yawRatePID(0.3, 0, 0, 0.3);
+PID rollPID(6);
+PID pitchPID(6);
+PID yawPID(3);
+Vector maxRate(radians(360), radians(360), radians(360));
+float tiltMax = radians(30);
 int flightModes[] = {STAB, STAB, STAB}; // map for rc mode switch
 
-extern const int MOTOR_REAR_LEFT, MOTOR_REAR_RIGHT, MOTOR_FRONT_RIGHT, MOTOR_FRONT_LEFT;
+extern const int MOT_RL, MOT_RR, MOT_FR, MOT_FL;
 extern float controlRoll, controlPitch, controlThrottle, controlYaw, controlMode;
 
 void control() {
@@ -132,40 +107,41 @@ void controlTorque() {
 	if (!torqueTarget.valid()) return; // skip torque control
 
 	if (!armed) {
-		memset(motors, 0, sizeof(motors)); // stop motors if disarmed
+		for (float& m : motors) m = 0; // stop motors if disarmed
 		return;
 	}
 
 	if (thrustTarget < 0.1) {
-		motors[0] = 0.1; // idle thrust
-		motors[1] = 0.1;
-		motors[2] = 0.1;
-		motors[3] = 0.1;
+		for (float& m : motors) m = 0.1; // idle thrust
 		return;
 	}
 
-	motors[MOTOR_FRONT_LEFT] = thrustTarget + torqueTarget.x - torqueTarget.y + torqueTarget.z;
-	motors[MOTOR_FRONT_RIGHT] = thrustTarget - torqueTarget.x - torqueTarget.y - torqueTarget.z;
-	motors[MOTOR_REAR_LEFT] = thrustTarget + torqueTarget.x + torqueTarget.y - torqueTarget.z;
-	motors[MOTOR_REAR_RIGHT] = thrustTarget - torqueTarget.x + torqueTarget.y + torqueTarget.z;
+	motors[MOT_FL] = thrustTarget + torqueTarget.x - torqueTarget.y + torqueTarget.z;
+	motors[MOT_FR] = thrustTarget - torqueTarget.x - torqueTarget.y - torqueTarget.z;
+	motors[MOT_RL] = thrustTarget + torqueTarget.x + torqueTarget.y - torqueTarget.z;
+	motors[MOT_RR] = thrustTarget - torqueTarget.x + torqueTarget.y + torqueTarget.z;
 
-	// Prioritize angle control over thrust control
-	desaturate(motors[MOTOR_FRONT_LEFT], motors[MOTOR_FRONT_RIGHT], motors[MOTOR_REAR_LEFT], motors[MOTOR_REAR_RIGHT]);
-
-	motors[0] = constrain(motors[0], 0, 1);
-	motors[1] = constrain(motors[1], 0, 1);
-	motors[2] = constrain(motors[2], 0, 1);
-	motors[3] = constrain(motors[3], 0, 1);
+	desaturate(); // prioritize angle control over thrust control
 }
 
-void desaturate(float& a, float& b, float& c, float& d) {
-	float maxThrust = max(max(a, b), max(c, d));
-	if (maxThrust > 1) {
-		float diff = maxThrust - 1;
-		a -= diff;
-		b -= diff;
-		c -= diff;
-		d -= diff;
+void desaturate() {
+	float max_ = -INFINITY, min_ = INFINITY;
+	float correction = 0;
+
+	// Find maximum and minimum thrust
+	for (float m : motors) {
+		if (m > max_) max_ = m;
+		if (m < min_) min_ = m;
+	}
+
+	if (max_ > 1) { // thrust is above maximum
+		correction = max_ - 1;
+	} else if (min_ < 0) { // thrust is below minimum
+		correction = min_;
+	}
+
+	for (float& m : motors) {
+		m -= correction;
 	}
 }
 

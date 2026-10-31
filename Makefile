@@ -1,16 +1,33 @@
-BOARD = esp32:esp32:d1_mini32:DebugLevel=error
-PORT := $(strip $(wildcard /dev/serial/by-id/usb-Silicon_Labs_CP21* /dev/serial/by-id/usb-1a86_USB_Single_Serial_* /dev/cu.usbserial-* /dev/cu.usbmodem*))
+FQBN = esp32:esp32:esp32
+PORT = $(strip $(wildcard /dev/serial/by-id/usb-Silicon_Labs_CP21* /dev/serial/by-id/usb-1a86_USB_Single_Serial_* /dev/cu.usbserial-* /dev/cu.usbmodem*))
+VERSION = $(shell git describe --always --dirty)
+FLAGS = -DVERSION=$(VERSION)
 
-export ARDUINO_NETWORK_CONNECTION_TIMEOUT := 1h
+esp32 = esp32:esp32:esp32:DebugLevel=error
+esp32c3 = esp32:esp32:esp32c3:DebugLevel=error,CDCOnBoot=cdc
+esp32s3 = esp32:esp32:esp32s3:DebugLevel=error,CDCOnBoot=cdc
+esp32s3.qspi = esp32:esp32:esp32s3:DebugLevel=error,CDCOnBoot=cdc,PSRAM=enabled
+esp32s3.opi = esp32:esp32:esp32s3:DebugLevel=error,CDCOnBoot=cdc,PSRAM=opi
+flix2 = esp32:esp32:esp32s3:DebugLevel=error,CDCOnBoot=cdc,PSRAM=opi
+
+ifdef TARGET
+FQBN = $($(TARGET))
+FLAGS += -D$(shell echo $(TARGET) | tr 'a-z.' 'A-Z_')
+EXTRA += --output-dir=flix/dist/$(TARGET)
+endif
+
+export ARDUINO_NETWORK_CONNECTION_TIMEOUT = 1h
+export ARDUINO_SKETCH_ALWAYS_EXPORT_BINARIES = 1
 
 build: .core .libs
-	arduino-cli compile --fqbn $(BOARD) flix
+	arduino-cli compile flix --fqbn $(FQBN) \
+		--build-property "compiler.cpp.extra_flags=$(FLAGS)" $(EXTRA)
 
 upload: build
-	arduino-cli upload --fqbn $(BOARD) -p "$(PORT)" flix
+	arduino-cli upload flix --fqbn $(FQBN) -p "$(PORT)"
 
 erase:
-	arduino-cli burn-bootloader --fqbn $(BOARD) -p "$(PORT)" -P esptool
+	arduino-cli burn-bootloader --fqbn $(FQBN) -p "$(PORT)" -P esptool
 
 monitor:
 	arduino-cli monitor -p "$(PORT)" -c baudrate=115200
@@ -22,13 +39,13 @@ core .core:
 
 libs .libs:
 	arduino-cli lib update-index
-	arduino-cli lib install "FlixPeriph"
-	arduino-cli lib install "MAVLink"@2.0.25
+	ARDUINO_LIBRARY_ENABLE_UNSAFE_INSTALL=1 arduino-cli lib install --git-url 'https://github.com/okalachev/flixperiph.git#dev'
+	arduino-cli lib install "MAVLink"@2.0.33
 	touch .libs
 
 upload_proxy: .core .libs
-	arduino-cli compile --fqbn $(BOARD) tools/espnow-proxy
-	arduino-cli upload --fqbn $(BOARD) -p "$(PORT)" tools/espnow-proxy
+	arduino-cli compile tools/espnow-proxy --fqbn $(FQBN)
+	arduino-cli upload tools/espnow-proxy --fqbn $(FQBN) -p "$(PORT)"
 
 gazebo/build cmake: gazebo/CMakeLists.txt
 	mkdir -p gazebo/build
@@ -51,4 +68,4 @@ plot:
 clean:
 	rm -rf gazebo/build flix/build flix/cache .core .libs
 
-.PHONY: build upload monitor core libs cmake build_simulator simulator log clean
+.PHONY: build upload monitor core libs cmake build_simulator simulator log clean upload_proxy
