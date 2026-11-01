@@ -157,14 +157,14 @@ Parameter parameters[] = {
 	{"SF_DESCEND_TIME", &descendTime},
 	{"SF_DISARM_TILT", &disarmTilt},
 	// led
-	{"LED_TYPE", &ledType, setupLED},
-	{"LED_PIN", &ledPin, setupLED},
-	{"LED_COUNT", &ledCount, setupLED},
-	{"LED_BRIGHTNESS", &ledBrightness, setupLED},
-	{"LED_ANIM_RAW", &modeAnimation[0], setupLED},
-	{"LED_ANIM_ACRO", &modeAnimation[1], setupLED},
-	{"LED_ANIM_STAB", &modeAnimation[2], setupLED},
-	{"LED_ANIM_AUTO", &modeAnimation[3], setupLED},
+	// {"LED_TYPE", &ledType, setupLED},
+	// {"LED_PIN", &ledPin, setupLED},
+	// {"LED_COUNT", &ledCount, setupLED},
+	// {"LED_BRIGHTNESS", &ledBrightness, setupLED},
+	// {"LED_ANIM_RAW", &modeAnimation[0], setupLED},
+	// {"LED_ANIM_ACRO", &modeAnimation[1], setupLED},
+	// {"LED_ANIM_STAB", &modeAnimation[2], setupLED},
+	// {"LED_ANIM_AUTO", &modeAnimation[3], setupLED},
 };
 
 void setupParameters() {

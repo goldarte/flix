@@ -3,6 +3,7 @@
 
 // Main firmware file
 
+#include <FlixPeriph.h>
 #include "vector.h"
 #include "quaternion.h"
 #include "util.h"
@@ -14,6 +15,7 @@ extern Vector rates;
 extern Quaternion attitude;
 extern bool landed;
 extern float motors[4];
+
 
 void setup() {
 	setupConsole();
@@ -29,6 +31,7 @@ void setup() {
 	setupRC();
 	setupEstimate();
 	setupLog();
+	setLED(false);
 	print("Initializing complete\n");
 }
 
@@ -42,9 +45,8 @@ void loop() {
 	handleConsole();
 	processMavlink();
 	readVoltage();
-	loopLED();
+	handleLED();
+	loopLEDStrip();
 	loopLog();
 	syncParameters();
-	handleLED();
-	handleLEDStrip();
 }

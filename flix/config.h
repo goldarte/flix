@@ -28,18 +28,18 @@ void setDefaults() {
 		pwmFrequency = 38000;
 	#endif
 
-	#ifdef CONFIG_IDF_TARGET_ESP32
-		// classic esp32 configuration
-		motorPins[MOT_RL] = 12;
-		motorPins[MOT_RR] = 13;
-		motorPins[MOT_FR] = 14;
-		motorPins[MOT_FL] = 15;
-	#endif
+	// #ifdef CONFIG_IDF_TARGET_ESP32
+	// 	// classic esp32 configuration
+	// 	motorPins[MOT_RL] = 12;
+	// 	motorPins[MOT_RR] = 13;
+	// 	motorPins[MOT_FR] = 14;
+	// 	motorPins[MOT_FL] = 15;
+	// #endif
 
-	#ifdef RGB_BUILTIN
-		ledType = 1; // WS2812
-		ledPin = RGB_BUILTIN;
-	#endif
+	// #ifdef RGB_BUILTIN
+	// 	ledType = 1; // WS2812
+	// 	ledPin = RGB_BUILTIN;
+	// #endif
 
 	#ifdef FLIX2
 		imuModel = 4; // ICM-40609-D

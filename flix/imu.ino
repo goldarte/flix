@@ -10,17 +10,13 @@
 #include "filter.h"
 #include "util.h"
 
-<<<<<<< HEAD
-MPU9250 imu(SPI);
-Vector imuRotation(0, 0, 0); // imu orientation as Euler angles
-=======
 IMU *imu;
-int imuModel = -1; // 1 - MPU9250, 2 - ICM20948, 3 - MPU6050, 4 - ICM40609D
+int imuModel = 1; // 1 - MPU9250, 2 - ICM20948, 3 - MPU6050, 4 - ICM40609D
 int imuBus = 0; // 0 - SPI, 1 - I2C
-int imuSckPin = SCK, imuMisoPin = MISO, imuMosiPin = MOSI, imuCsPin = SS, imuIntPin = -1;
+//int imuSckPin = SCK, imuMisoPin = MISO, imuMosiPin = MOSI, imuCsPin = SS, imuIntPin = -1;
+int imuSckPin = 1, imuMisoPin = 3, imuMosiPin = 2, imuCsPin = 4, imuIntPin = -1;
 int imuSdaPin = SDA, imuSclPin = SCL;
-Vector imuRotation(0, 0, PI / 2); // imu orientation as Euler angles
->>>>>>> upstream/dev
+Vector imuRotation(0, 0, 0); // imu orientation as Euler angles
 
 Vector gyro; // gyroscope output, rad/s
 Vector gyroBias;
@@ -33,36 +29,13 @@ LowPassFilter<Vector> gyroBiasFilter(0.001);
 
 void setupIMU() {
 	print("Setup IMU\n");
-<<<<<<< HEAD
-
-	// default pins
-	// static const uint8_t SS = 5;
-	// static const uint8_t MOSI = 23;
-	// static const uint8_t MISO = 19;
-	// static const uint8_t SCK = 18;
-
-	// default connection
-	// SCL → IO18 (SCK)
-	// SDA (MOSI) → IO23 (MOSI)
-	// AD0 (MISO) → IO19 (MISO)
-	// NCS → IO5 (SS)
-
-	// new connection
-	// SCL - 1
-	// SDA - 2
-	// AD0 - 3
-	// NCS - 4
-
-	// Use custom pins for SCK, MISO, MOSI, and SS
-	SPI.begin(1,3,2,4);
-	imu.begin();
-=======
 	free(imu);
 	if (imuModel == 3) imuBus = 1; // MPU6050 is I2C only
 
 	if (imuBus == 0) {
 		// SPI connection
 		SPI.begin(imuSckPin, imuMisoPin, imuMosiPin);
+		// SPI.begin(1,3,2,4);
 		imu = IMU::create(imuModel, SPI, imuCsPin, imuIntPin);
 	} else {
 		// I2C connection
@@ -71,7 +44,6 @@ void setupIMU() {
 	}
 
 	imu->begin();
->>>>>>> upstream/dev
 	configureIMU();
 }
 
